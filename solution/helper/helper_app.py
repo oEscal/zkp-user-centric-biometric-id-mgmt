@@ -13,6 +13,9 @@ from utils.utils import ZKP, overlap_intervals, \
 	Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from managers import Master_Password_Manager, Password_Manager
 
+import facial_recognition
+
+
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
@@ -481,6 +484,7 @@ class HelperApp(object):
 	@cherrypy.expose
 	def register(self, **kwargs):
 		if cherrypy.request.method == 'GET':
+			facial_recognition.recognition()
 			return Template(filename='static/register.html').render()
 		elif cherrypy.request.method == 'POST':
 			username = kwargs['username']
