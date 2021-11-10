@@ -290,3 +290,5 @@ fabric.properties
 **/accounts/
 
 report/
+
+sessions/

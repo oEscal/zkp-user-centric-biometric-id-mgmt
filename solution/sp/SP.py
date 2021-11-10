@@ -12,8 +12,6 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from mako.template import Template
 
-import sys
-sys.path.append('..')
 from utils.utils import create_directory, create_get_url, asymmetric_padding_signature, asymmetric_hash
 
 
@@ -48,7 +46,7 @@ class SP(object):
 		:param path:
 		:return:
 		"""
-		return open(f"static/{path}", 'r').read()
+		return open(f"sp/static/{path}", 'r').read()
 
 	@staticmethod
 	def set_cookie(name: str, value: str):
