@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-lg-6">
+    <div class="card1 pb-5">
+        <div class="row"><img src="http://www.sighabitat.pt/files/entidades/10_1.png" class="logo"></div>
+        <div class="row px-3 justify-content-center mt-4 mb-5 border-line"><img
+                src="https://i.imgur.com/uNGdWHi.png" class="image"></div>
+    </div>
+</div>
+<div class="col-lg-6">
+    <div class="card2 card border-0 px-4 py-5">
+        <div class="row mb-4 px-3">
+            <h2 class="mb-0 mr-4 mt-2">Create account in this IDP</h2>
+        </div>
+        <div class="row px-3 mb-4">
+            <div class="line"></div>
+
+            <div class="line"></div>
+        </div>
+        <form action="/create_account" method="post">
+            <div class="row px-3"><label class="mb-1">
+                <h6 class="mb-0 text-sm">Username</h6>
+            </label> <input id="username" class="mb-4" type="text" name="username"
+                            placeholder="Enter a valid username"
+                            required>
+            </div>
+            <div class="row px-3"><label class="mb-1">
+                <h6 class="mb-0 text-sm">Password</h6>
+            </label> <input id="password" type="password" name="password" placeholder="Enter password"
+                            required>
+            </div>
+            <br>
+            <div class="row mb-3 px-3">
+                <button type="submit" class="btn btn-blue text-center">Create account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+<script>
+    /*
+    function save_locally(decision) {
+        if (decision === 'yes') {
+            window.open('http://localhost:8083/add_idp_account?carried=1', '_blank').focus();
+            window.location.href = '/';
+        } else {
+            window.location.href = '/';
+        }
+    }
+
+
+    $(document).ready(function () {
+        let $form = $('form');
+        $form.submit(function () {
+            $.post($(this).attr('action'), $(this).serialize(), function (response) {
+                let status = response['status'];
+                if (status === 'OK') {
+                    $('#helper_save').modal('show');
+
+                } else {
+                    alert("Error creating a new account in this idp");
+                }
+
+            }, 'json');
+            return false;
+        });
+    });
+*/
+
+</script>
+
+
+</body>
+</html>

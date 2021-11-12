@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-lg-6">
+    <div class="card1 pb-5">
+        <div class="row"><img src="http://www.sighabitat.pt/files/entidades/10_1.png" class="logo"></div>
+        <div class="row px-3 justify-content-center mt-4 mb-5 border-line">
+            <img src="https://i.imgur.com/uNGdWHi.png" class="image"></div>
+    </div>
+</div>
+<div class="col-lg-6">
+    <div class="card2 card border-0 px-4 py-5">
+        <div class="row mb-4 px-3">
+            <h2 class="mb-0 mr-4 mt-2">Login in IDP</h2>
+        </div>
+        <div class="row px-3 mb-4">
+            <div class="line"></div>
+
+            <div class="line"></div>
+        </div>
+        <form action="/authenticate_locally" method="post">
+            <div class="row px-3"><label class="mb-1">
+                <h6 class="mb-0 text-sm">Username</h6>
+            </label> <input class="mb-4" type="text" name="username"
+                            placeholder="Enter a valid username or email"
+                            required>
+            </div>
+            <div class="row px-3"><label class="mb-1">
+                <h6 class="mb-0 text-sm">Password</h6>
+            </label> <input type="password" name="password" placeholder="Enter password" required>
+            </div>
+            <div class="row px-3 mb-4">
+                <button type="submit" class="btn btn-blue text-center">Login</button>
+            </div>
+            <div class="row mb-4 px-3"><small class="font-weight-bold">Don't have an account? <a
+                    class="text-danger " href="/sign_up">Register</a></small></div>
+        </form>
+    </div>
+</div>
+{% endblock %}

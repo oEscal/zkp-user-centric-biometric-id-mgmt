@@ -10,10 +10,12 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 
-from idp.queries import setup_database, get_user, save_user_key, get_user_key
+from idp.queries import setup_database, get_user, save_user_key, get_user_key, save_user, check_credentials
 from utils.utils import ZKP_IdP, asymmetric_padding_signature, asymmetric_hash, create_get_url, \
     Cipher_Authentication, \
     asymmetric_upload_derivation_key, asymmetric_padding_encryption
+
+from jinja2 import Environment, FileSystemLoader
 
 HOST_NAME = '127.0.0.1'
 HOST_PORT = 8082
@@ -47,9 +49,42 @@ class Asymmetric_IdP(object):
 class IdP(Asymmetric_IdP):
     def __init__(self):
         super().__init__()
+        self.jinja_env = Environment(loader=FileSystemLoader('idp/static'))
+
+    @cherrypy.expose
+    def index(self):
+        username = cherrypy.session.get('username')
+        if not username:
+            raise cherrypy.HTTPRedirect('/login')
+
+        raise cherrypy.HTTPRedirect('/account')
+
+    @cherrypy.expose
+    def logout(self):
+        # Clear session
+        cherrypy.session.clear()
+        raise cherrypy.HTTPRedirect('/')
 
     @cherrypy.expose
     def login(self):
+        return self.jinja_env.get_template('login.html').render()
+
+    @cherrypy.expose
+    def sign_up(self):
+        return self.jinja_env.get_template('sign_up.html').render()
+
+    @cherrypy.expose
+    def account(self):
+        username = cherrypy.session.get('username')
+        if not username:
+            raise cherrypy.HTTPRedirect('/login')
+
+        user = get_user(username, as_dict=True)
+        template = self.jinja_env.get_template('account.html')
+        return template.render(username=username, password=user.get('password'))
+
+    @cherrypy.expose
+    def start_authentication(self):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
@@ -64,6 +99,30 @@ class IdP(Asymmetric_IdP):
                                                        'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
                                                        'id_url': f"{HOST_URL}/{self.identification.__name__}"
                                                    }), 307)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def create_account(self, username, password):
+        creation_status = save_user(username, password)
+        if not creation_status:
+            raise cherrypy.HTTPError(500, message='Error creating new account')
+
+        raise cherrypy.HTTPRedirect('/login')
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def update_account(self):
+        pass
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def authenticate_locally(self, username, password):
+        login_status = check_credentials(username, password)
+        if not login_status:
+            raise cherrypy.HTTPError(403, message='Wrong credentials')
+
+        cherrypy.session['username'] = username
+        raise cherrypy.HTTPRedirect('/')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -190,6 +249,15 @@ class IdP(Asymmetric_IdP):
 if __name__ == '__main__':
     setup_database()
 
-    cherrypy.config.update({'server.socket_host': HOST_NAME,
-                            'server.socket_port': HOST_PORT})
+    cherrypy.config.update({
+        'server.socket_host': HOST_NAME,
+        'server.socket_port': HOST_PORT,
+        'server.thread_pool': 20,
+        'tools.sessions.on': True,
+        'tools.sessions.storage_type': "File",
+        'tools.sessions.storage_path': 'idp/sessions',
+        'tools.sessions.timeout': 60,
+        'tools.sessions.clean_freq': 10,
+        'tools.sessions.name': 'idp_session_id',
+    })
     cherrypy.quickstart(IdP())
