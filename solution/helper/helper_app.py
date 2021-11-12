@@ -6,6 +6,7 @@ import cherrypy
 import requests
 from mako.template import Template
 
+from helper.biometric_systems.facial.facial_recognition import Face_biometry
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
@@ -41,6 +42,8 @@ class HelperApp(object):
 
         self.response_attrs_b64 = ''
         self.response_signature_b64 = ''
+
+        self.face_biometry = Face_biometry('escaleira')
 
     @staticmethod
     def static_contents(path):
@@ -495,6 +498,13 @@ class HelperApp(object):
                 message='Success: The user was registered with success')
         else:
             raise cherrypy.HTTPError(405)
+
+    @cherrypy.expose
+    def biometric_authentication(self, operation):
+        if operation == 'r':
+            self.face_biometry.register_new_user()
+        elif operation == 'v':
+            self.face_biometry.verify_user()
 
 
 if __name__ == '__main__':
