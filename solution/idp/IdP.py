@@ -180,7 +180,7 @@ class IdP(Asymmetric_IdP):
             if 'username' in request_args:
                 username = str(request_args['username'])
                 current_zkp.username = username
-                current_zkp.password = get_user(username)[0].encode()
+                current_zkp.password = get_user(username, as_dict=True).get('password', '').encode()
             else:
                 del current_zkp
                 raise cherrypy.HTTPError(400,
