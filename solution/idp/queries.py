@@ -1,5 +1,6 @@
 import sqlite3
 import bcrypt
+import re
 
 DB_NAME = 'idp/idp.db'
 
@@ -11,13 +12,59 @@ def dict_factory(cursor, row):
     return d
 
 
-def get_user(username: str, as_dict=False) -> tuple or dict:
+def get_user(field_content: str, field_name='username', as_dict=False) -> tuple or dict:
+    regex = re.compile('[^a-zA-Z]')
+    field_name = regex.sub('', field_name)
+
     with sqlite3.connect(DB_NAME) as con:
         if as_dict:
             con.row_factory = dict_factory
-        r = con.execute("SELECT password FROM user WHERE username=?",
-                        [username])
-        return r.fetchone()
+        r = con.execute(f"SELECT * FROM user WHERE {field_name}=?",
+                        [field_content])
+
+    return r.fetchone() or ({} if as_dict else [])
+
+
+def save_user(username: str, password: str):
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute("INSERT INTO user(username, password) values(?, ?)", (username, hashed))
+            con.commit()
+
+            return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def update_user(user_id, new_args):
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            if 'password' in new_args:
+                new_args['password'] = bcrypt.hashpw(new_args['password'].encode(), bcrypt.gensalt())
+
+            query = ", ".join([f'{field_name}=?' for field_name in new_args])
+            values = list(new_args.values())
+
+            con.execute(f'UPDATE USER SET {query} where id = ?', (*values, user_id))
+            con.commit()
+
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def delete_user(user_id):
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute('DELETE FROM USER where id = ?', (user_id))
+            con.commit()
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
 
 
 def save_user_key(id: str, username: str, key: str, not_valid_after: float) -> bool:
@@ -38,19 +85,6 @@ def get_user_key(id: str, username: str) -> tuple:
         return r.fetchone()
 
 
-def save_user(username: str, password: str):
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    try:
-        with sqlite3.connect(DB_NAME) as con:
-            con.execute("INSERT INTO user(username, password) values(?, ?)", (username, hashed))
-            con.commit()
-
-            return True
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-
 def check_credentials(username, password):
     saved_hashed_password = get_user(username, as_dict=True).get('password')
     if saved_hashed_password is None:
@@ -62,7 +96,8 @@ def check_credentials(username, password):
 def setup_database():
     with sqlite3.connect(DB_NAME) as con:
         con.execute("CREATE TABLE if not exists user ("
-                    "username text primary key,"
+                    "id integer primary key,"
+                    "username text not null unique,"
                     "password blob null"
                     ")")
         con.execute("CREATE TABLE if not exists keys ("

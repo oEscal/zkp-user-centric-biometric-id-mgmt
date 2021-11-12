@@ -15,7 +15,7 @@
             <label class="mb-1">
                 <h6 class="mb-0 text-sm">Username</h6>
             </label>
-            <input id="username_{{username}}" class="mb-4" type="text" name="username"
+            <input id="username_{{id}}" class="mb-4" type="text" name="username"
                    placeholder="Enter a valid username"
                    value="{{username}}" required>
         </div>
@@ -25,10 +25,10 @@
             </label>
             </label>
             <div class="input-group">
-                <input id="password_{{username}}" type="password" class="form-control pwd" name="password"
+                <input id="password_{{id}}" type="password" class="form-control pwd" name="password"
                        placeholder="Enter current password" required>
 
-                <div class="input-group-append" onclick="see_password('password_{{username}}')">
+                <div class="input-group-append" onclick="see_password('password_{{id}}')">
                              <span class="input-group-text">
                              <i class="fa fa-eye"></i>
                              </span>
@@ -40,10 +40,10 @@
                 <h6 class="mb-0 text-sm">New password</h6>
             </label>
             <div class="input-group">
-                <input id="new_password_{{username}}" type="password" class="form-control pwd" name="new_password"
+                <input id="new_password_{{id}}" type="password" class="form-control pwd" name="new_password"
                        placeholder="Enter new password" required>
 
-                <div class="input-group-append" onclick="see_password('new_password_{{username}}')">
+                <div class="input-group-append" onclick="see_password('new_password_{{id}}')">
                              <span class="input-group-text">
                              <i class="fa fa-eye"></i>
                              </span>
@@ -54,13 +54,13 @@
         <div class="row px-3" style="margin-top: 20px">
 
                           <span class="input-group-btn">
-                            <button class="btn btn-dark reveal" type="button" onclick="update_account('{{username}}')">Update credentials</button>
+                            <button class="btn btn-dark reveal" type="button" onclick="update_account('{{id}}')">Update credentials</button>
                           </span>
 
             &nbsp;&nbsp;
             <span class="input-group-btn">
                             <button class="btn btn-danger reveal" type="button"
-                                    onclick="delete_account('{{username}}')">Delete account</button>
+                                    onclick="delete_account('{{id}}')">Delete account</button>
                           </span>
 
         </div>
@@ -83,28 +83,36 @@
 
     }
 
-    function delete_account(account_id) {
+    function delete_account(user_id) {
+        let password = $(`#password_${user_id}`).val();
+
+        if (password === "") {
+            alert("You need to insert current password in order to update these credentials!");
+            return;
+        }
+
         $.ajax({
             type: "DELETE",
-            url: `/delete_account?account_id=${account_id}`,
+            url: `/delete_account?user_id=${user_id}&password=${password}`,
             contentType: "application/json",
             dataType: 'json',
-            success: (e) => {
-                let status = e['status'];
-                if (status === 'OK') {
-                    window.location.href = '/logout';
-                } else {
-                    alert("Error deleting this account");
-                }
+            success: (_) => {
+                window.location.href = '/logout';
+            },
+            error: (e) => {
+                if (e.status === 403)
+                    alert("Wrong password");
+                else if (e.status === 500)
+                    alert("Error while deleting account");
             }
         });
     }
 
 
-    function update_account(account_id) {
-        let username = $(`#username_${account_id}`).val();
-        let password = $(`#password_${account_id}`).val();
-        let new_password = $(`#new_password_${account_id}`).val();
+    function update_account(user_id) {
+        let username = $(`#username_${user_id}`).val();
+        let password = $(`#password_${user_id}`).val();
+        let new_password = $(`#new_password_${user_id}`).val();
 
         if (password === "") {
             alert("You need to insert current password in order to update these credentials!");
@@ -112,19 +120,18 @@
         }
         $.ajax({
             type: "POST",
-            url: `/update_account?user_id=${account_id}&username=${username}&password=${password}&new_password=${new_password}`,
+            url: `/update_account?user_id=${user_id}&username=${username}&password=${password}&new_password=${new_password}`,
             contentType: "application/json",
             dataType: 'json',
-            success: (e) => {
-                let status = e['status'];
-
-                if (status === "NOTHING")
-                    alert("Nothing to update");
-                else if (status === "OK") {
-                    alert("Account updated");
-                    location.reload();
-                } else
-                    alert(`${e.message}`);
+            success: (_) => {
+                alert('Account updated');
+                location.reload();
+            },
+            error: (e) => {
+                if (e.status === 403)
+                    alert("Wrong password");
+                else if (e.status === 500)
+                    alert("Error while updating account");
             }
         });
     }

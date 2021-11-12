@@ -10,7 +10,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 
-from idp.queries import setup_database, get_user, save_user_key, get_user_key, save_user, check_credentials
+from idp.queries import setup_database, get_user, save_user_key, get_user_key, save_user, check_credentials, \
+    update_user, delete_user
 from utils.utils import ZKP_IdP, asymmetric_padding_signature, asymmetric_hash, create_get_url, \
     Cipher_Authentication, \
     asymmetric_upload_derivation_key, asymmetric_padding_encryption
@@ -53,8 +54,8 @@ class IdP(Asymmetric_IdP):
 
     @cherrypy.expose
     def index(self):
-        username = cherrypy.session.get('username')
-        if not username:
+        user_id = cherrypy.session.get('user_id')
+        if not user_id:
             raise cherrypy.HTTPRedirect('/login')
 
         raise cherrypy.HTTPRedirect('/account')
@@ -75,13 +76,13 @@ class IdP(Asymmetric_IdP):
 
     @cherrypy.expose
     def account(self):
-        username = cherrypy.session.get('username')
-        if not username:
+        user_id = cherrypy.session.get('user_id')
+        if not user_id:
             raise cherrypy.HTTPRedirect('/login')
 
-        user = get_user(username, as_dict=True)
+        user = get_user(user_id, 'id', as_dict=True)
         template = self.jinja_env.get_template('account.html')
-        return template.render(username=username, password=user.get('password'))
+        return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
     def start_authentication(self):
@@ -111,8 +112,46 @@ class IdP(Asymmetric_IdP):
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def update_account(self):
-        pass
+    def update_account(self, user_id, password, **kwargs):
+        saved_user = get_user(user_id, 'id', as_dict=True)
+        password_correctness_status = check_credentials(saved_user.get('username'), password)
+
+        if not password_correctness_status:
+            raise cherrypy.HTTPError(403, message='Wrong password')
+
+        kwargs['password'] = kwargs.pop('new_password', None)
+
+        new_args = {}
+        for field_name, field_content in kwargs.items():
+            if field_name == "password" and check_credentials(saved_user.get('username'), field_content):
+                continue
+            if len(field_content) == 0 or saved_user.get(field_name) == field_content:
+                continue
+            new_args[field_name] = field_content
+
+        if len(new_args) == 0:
+            return {'status': 'NOTHING'}
+
+        update_status = update_user(user_id, new_args)
+        if not update_status:
+            raise cherrypy.HTTPError(500, message='Error while updating account')
+
+        return {'status': 'OK'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def delete_account(self, user_id, password):
+        saved_user = get_user(user_id, 'id', as_dict=True)
+        password_correctness_status = check_credentials(saved_user.get('username'), password)
+
+        if not password_correctness_status:
+            raise cherrypy.HTTPError(403, message='Wrong password')
+
+        removal_status = delete_user(user_id)
+        if not removal_status:
+            raise cherrypy.HTTPError(500, message='Error while deleting account')
+
+        return {'status': 'OK'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -121,7 +160,7 @@ class IdP(Asymmetric_IdP):
         if not login_status:
             raise cherrypy.HTTPError(403, message='Wrong credentials')
 
-        cherrypy.session['username'] = username
+        cherrypy.session['user_id'] = get_user(username, as_dict=True).get('id')
         raise cherrypy.HTTPRedirect('/')
 
     @cherrypy.expose
