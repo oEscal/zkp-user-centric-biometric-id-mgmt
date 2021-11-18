@@ -10,7 +10,7 @@ DIRECTORY_SAVE = 'helper/biometric_systems/faces'
 
 
 def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> list[float]:
-	return face_recognition.face_encodings(frame, known_face_locations=face_locations, model='large')[0]
+	return face_recognition.face_encodings(frame, known_face_locations=face_locations, model='large')[0].tolist()
 
 
 class Faces:

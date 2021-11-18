@@ -43,7 +43,7 @@ class HelperApp(object):
         self.response_attrs_b64 = ''
         self.response_signature_b64 = ''
 
-        self.face_biometry = Face_biometry('escaleira')
+        self.face_biometry: Face_biometry = None    # = Face_biometry('escaleira')
 
     @staticmethod
     def static_contents(path):
@@ -421,7 +421,7 @@ class HelperApp(object):
         self.zkp_auth()
 
     @cherrypy.expose
-    def authenticate(self, max_iterations, min_iterations, client, key, auth_url, save_pk_url, id_url):
+    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
@@ -434,18 +434,23 @@ class HelperApp(object):
         self.save_pk_url = save_pk_url
         self.id_url = id_url
 
-        self.max_idp_iterations = int(max_iterations)
-        self.min_idp_iterations = int(min_iterations)
-        if overlap_intervals(MIN_ITERATIONS_ALLOWED, MAX_ITERATIONS_ALLOWED,
-                             self.min_idp_iterations, self.max_idp_iterations):
-            self.iterations = random.randint(max(MIN_ITERATIONS_ALLOWED, self.min_idp_iterations),
-                                             min(MAX_ITERATIONS_ALLOWED, self.max_idp_iterations))
+        if method == 'face':
+            return Template(filename='helper/static/biometric_auth.html').render(idp=self.idp, method=method,
+                                                                                 operation='verify')
         else:
-            self.iterations = 0
-            raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
-                                                       params={'error_id': 'idp_iterations'}), 301)
+            self.max_idp_iterations = int(max_iterations)
 
-        return Template(filename='helper/static/keychain.html').render(action='auth')
+            self.min_idp_iterations = int(min_iterations)
+            if overlap_intervals(MIN_ITERATIONS_ALLOWED, MAX_ITERATIONS_ALLOWED,
+                                 self.min_idp_iterations, self.max_idp_iterations):
+                self.iterations = random.randint(max(MIN_ITERATIONS_ALLOWED, self.min_idp_iterations),
+                                                 min(MAX_ITERATIONS_ALLOWED, self.max_idp_iterations))
+            else:
+                self.iterations = 0
+                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                                                           params={'error_id': 'idp_iterations'}), 301)
+
+            return Template(filename='helper/static/keychain.html').render(action='auth')
 
     @cherrypy.expose
     def choose_iterations(self, **kwargs):
@@ -500,11 +505,27 @@ class HelperApp(object):
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
-    def biometric_authentication(self, operation):
-        if operation == 'r':
-            self.face_biometry.register_new_user()
-        elif operation == 'v':
-            self.face_biometry.verify_user()
+    def biometric_face(self, username, operation):
+        if cherrypy.request.method != 'POST':
+            raise cherrypy.HTTPError(405)
+
+        self.face_biometry = Face_biometry(username)
+
+        if operation == 'verify':
+            features = self.face_biometry.get_facial_features()
+            print(features)
+
+            ciphered_params = self.cipher_auth.create_response({
+                'username': username,
+                'features': features
+            })
+
+            response = requests.get(self.auth_url, params={
+                'client': self.idp_client,
+                **ciphered_params
+            })
+
+            print(response)
 
 
 if __name__ == '__main__':

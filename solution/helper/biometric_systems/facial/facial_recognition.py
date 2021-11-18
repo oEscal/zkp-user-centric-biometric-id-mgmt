@@ -1,3 +1,6 @@
+import base64
+import json
+
 import cv2
 import face_recognition
 import numpy as np
@@ -71,6 +74,11 @@ class Face_biometry:
 			self.faces.add(new_face_features=face_features)
 		self.faces.save_faces()
 		print("All facial features saved with success")
+
+	def get_facial_features(self):
+		frame, face_locations = self.__take_shoot()
+		return get_features_from_face(frame=frame, face_locations=face_locations)
+		return base64.urlsafe_b64encode(json.dumps(face_features).encode())
 
 	def verify_user(self):
 		frame, face_locations = self.__take_shoot()

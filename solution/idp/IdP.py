@@ -53,7 +53,21 @@ class IdP(Asymmetric_IdP):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
-        zkp_values[client_id] = ZKP_IdP(key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
+        # TODO -> MUDAR ISTO
+        zkp_values[client_id] = ZKP_IdP(method='face', key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
+        raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/authenticate",
+                                                   params={
+                                                       'max_iterations': MAX_ITERATIONS_ALLOWED,
+                                                       'min_iterations': MIN_ITERATIONS_ALLOWED,
+                                                       'client': client_id,
+                                                       'method': 'face',
+                                                       'key': base64.urlsafe_b64encode(aes_key),
+                                                       'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
+                                                       'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
+                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}"
+                                                   }), 307)
+
+        """
         raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/authenticate",
                                                    params={
                                                        'max_iterations': MAX_ITERATIONS_ALLOWED,
@@ -64,6 +78,7 @@ class IdP(Asymmetric_IdP):
                                                        'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
                                                        'id_url': f"{HOST_URL}/{self.identification.__name__}"
                                                    }), 307)
+        """
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -72,35 +87,40 @@ class IdP(Asymmetric_IdP):
         current_zkp = zkp_values[client_id]
         request_args = current_zkp.decipher_response(kwargs)
 
-        # restart zkp
-        if 'restart' in request_args and request_args['restart']:
-            zkp_values[client_id] = ZKP_IdP(key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
-            current_zkp = zkp_values[client_id]
+        method = current_zkp.method
 
-        challenge = request_args['nonce'].encode()
-        if current_zkp.iteration < 2:
-            if 'username' in request_args:
-                username = str(request_args['username'])
-                current_zkp.username = username
-                current_zkp.password = get_user(username)[0].encode()
-            else:
-                del current_zkp
-                raise cherrypy.HTTPError(400,
-                                         message='The first request to this endpoint must have the parameter username')
-            if 'iterations' in request_args:
-                iterations = int(request_args['iterations'])
-                if MIN_ITERATIONS_ALLOWED <= iterations <= MAX_ITERATIONS_ALLOWED:
-                    current_zkp.max_iterations = iterations
+        if method == 'face':
+            print(request_args)
+        elif method == 'zkp':
+            # restart zkp
+            if 'restart' in request_args and request_args['restart']:
+                zkp_values[client_id] = ZKP_IdP(key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
+                current_zkp = zkp_values[client_id]
+
+            challenge = request_args['nonce'].encode()
+            if current_zkp.iteration < 2:
+                if 'username' in request_args:
+                    username = str(request_args['username'])
+                    current_zkp.username = username
+                    current_zkp.password = get_user(username)[0].encode()
                 else:
                     del current_zkp
-                    raise cherrypy.HTTPError(406, message='The number of iterations does not met the defined range')
-        else:
-            current_zkp.verify_challenge_response(int(request_args['response']))
+                    raise cherrypy.HTTPError(400,
+                                             message='The first request to this endpoint must have the parameter username')
+                if 'iterations' in request_args:
+                    iterations = int(request_args['iterations'])
+                    if MIN_ITERATIONS_ALLOWED <= iterations <= MAX_ITERATIONS_ALLOWED:
+                        current_zkp.max_iterations = iterations
+                    else:
+                        del current_zkp
+                        raise cherrypy.HTTPError(406, message='The number of iterations does not met the defined range')
+            else:
+                current_zkp.verify_challenge_response(int(request_args['response']))
 
-        challenge_response = current_zkp.response(challenge)
-        nonce = current_zkp.create_challenge()
+            challenge_response = current_zkp.response(challenge)
+            nonce = current_zkp.create_challenge()
 
-        return current_zkp.create_response({
+            return current_zkp.create_response({
             'nonce': nonce,
             'response': challenge_response
         })

@@ -79,9 +79,11 @@ class Cipher_Authentication(object):
 
 
 class ZKP_IdP(ZKP, Cipher_Authentication):
-	def __init__(self, key: bytes, max_iterations: int):
+	def __init__(self, method: str, key: bytes, max_iterations: int):
 		ZKP.__init__(self, password=b'')
 		Cipher_Authentication.__init__(self, key=key)
+
+		self.method = method
 
 		self.username = b''
 		self.id_attrs = list()
