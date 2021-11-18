@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 
 
-DIRECTORY_SAVE = 'helper/biometric_systems/faces'
+DIRECTORY_SAVE = 'idp/biometric_systems/faces'
 
 
 def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> list[float]:
@@ -26,8 +26,9 @@ class Faces:
 	def add(self, new_face_features: list[float]):
 		self.pre_defined_faces.append(new_face_features)
 
-	def verify_user(self, face_cmp: list[float]) -> list[bool]:
-		return face_recognition.compare_faces(self.pre_defined_faces, face_cmp, tolerance=0.4)
+	def verify_user(self, face_cmp: np.ndarray) -> float:
+		distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
+		return float(distances.mean())
 
 	def save_faces(self):
 		with open(f"{DIRECTORY_SAVE}/{self.username}", 'wb') as file:

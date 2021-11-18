@@ -10,6 +10,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 
+from idp.biometric_systems.facial.facial_recognition import Face_biometry
 from idp.queries import setup_database, get_user, save_user_key, get_user_key
 from utils.utils import ZKP_IdP, asymmetric_padding_signature, asymmetric_hash, create_get_url, \
     Cipher_Authentication, \
@@ -83,6 +84,16 @@ class IdP(Asymmetric_IdP):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def authenticate(self, **kwargs):
+        def set_username(request_args, current_zkp):
+            if 'username' in request_args:
+                username = str(request_args['username'])
+                current_zkp.username = username
+                current_zkp.password = get_user(username)[0].encode()
+            else:
+                del current_zkp
+                raise cherrypy.HTTPError(400,
+                                         message='The first request to this endpoint must have the parameter username')
+
         client_id = kwargs['client']
         current_zkp = zkp_values[client_id]
         request_args = current_zkp.decipher_response(kwargs)
@@ -90,7 +101,14 @@ class IdP(Asymmetric_IdP):
         method = current_zkp.method
 
         if method == 'face':
-            print(request_args)
+            set_username(request_args, current_zkp)
+
+            face_biometry = Face_biometry(current_zkp.username)
+            if face_biometry.verify_user(request_args['features']):
+                return {}
+            else:
+                raise cherrypy.HTTPError(401, message="Authentication failed")
+
         elif method == 'zkp':
             # restart zkp
             if 'restart' in request_args and request_args['restart']:
@@ -99,14 +117,7 @@ class IdP(Asymmetric_IdP):
 
             challenge = request_args['nonce'].encode()
             if current_zkp.iteration < 2:
-                if 'username' in request_args:
-                    username = str(request_args['username'])
-                    current_zkp.username = username
-                    current_zkp.password = get_user(username)[0].encode()
-                else:
-                    del current_zkp
-                    raise cherrypy.HTTPError(400,
-                                             message='The first request to this endpoint must have the parameter username')
+                set_username(request_args, current_zkp)
                 if 'iterations' in request_args:
                     iterations = int(request_args['iterations'])
                     if MIN_ITERATIONS_ALLOWED <= iterations <= MAX_ITERATIONS_ALLOWED:
@@ -121,9 +132,9 @@ class IdP(Asymmetric_IdP):
             nonce = current_zkp.create_challenge()
 
             return current_zkp.create_response({
-            'nonce': nonce,
-            'response': challenge_response
-        })
+                'nonce': nonce,
+                'response': challenge_response
+            })
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

@@ -45,7 +45,6 @@ class Face_biometry:
 			# Draw a rectangle around the faces
 			if take_shot:
 				for face in face_recognition.face_locations(frame):
-					cv2.rectangle(frame, (face[3], face[0]), (face[1], face[2]), (0, 255, 0), 2)
 					video_capture.release()
 					cv2.destroyAllWindows()
 					return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), [face]
@@ -75,14 +74,11 @@ class Face_biometry:
 		self.faces.save_faces()
 		print("All facial features saved with success")
 
-	def get_facial_features(self):
+	def get_facial_features(self) -> list[float]:
 		frame, face_locations = self.__take_shoot()
 		return get_features_from_face(frame=frame, face_locations=face_locations)
-		return base64.urlsafe_b64encode(json.dumps(face_features).encode())
 
-	def verify_user(self):
-		frame, face_locations = self.__take_shoot()
-		face_features = get_features_from_face(frame=frame, face_locations=face_locations)
+	def verify_user(self, face_features: list[float]):
 		all_verifications = self.faces.verify_user(face_features)
 
 		true_ctr = 0
@@ -95,3 +91,4 @@ class Face_biometry:
 
 		print(f"True percentage: {true_ctr / len(all_verifications) * 100}%")
 		print(f"False percentage: {false_ctr / len(all_verifications) * 100}%")
+		return true_ctr / len(all_verifications)

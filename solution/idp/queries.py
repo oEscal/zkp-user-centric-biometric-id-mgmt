@@ -1,7 +1,7 @@
 import sqlite3
 
 
-DB_NAME = 'idp.db'
+DB_NAME = 'idp/idp.db'
 
 
 def get_user(username: str) -> tuple:

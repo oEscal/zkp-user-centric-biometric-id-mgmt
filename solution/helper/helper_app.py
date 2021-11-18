@@ -525,7 +525,7 @@ class HelperApp(object):
                 **ciphered_params
             })
 
-            print(response)
+            return response.status_code
 
 
 if __name__ == '__main__':
