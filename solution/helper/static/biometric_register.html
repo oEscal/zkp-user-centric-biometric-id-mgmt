@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register using biometrics</title>
+</head>
+<body>
+<h1>Register using biometrics</h1>
+
+<form action="/update_idp_credentials" method="post">
+
+    <h2>Select the biometric method to register with:</h2>
+    <label for="face">Face</label>
+    <input type="radio" id="face" value="face" name="method">
+
+    <h2>Select the user you want to register:</h2>
+    <br>
+
+    % for idp in idps:
+    <h4>Your local registered users in the Identity Provider '<a href="${idp}">${idp}</a>': </h4>
+
+    % for user in idps[idp]:
+    <label for="${user}">${user}</label>
+    <input type="radio" id="${user}" value="${loop.parent.index}_${loop.index}" name="idp_user">
+    <br>
+    % endfor
+
+    <br>
+    <br>
+    % endfor
+
+    <br>
+    <input type="submit" value="Update"/>
+    % if context.get('message', UNDEFINED) is not UNDEFINED:
+    <br>
+    <br>
+    <br>
+    <h4>${message}</h4>
+    % endif
+</form>
+</body>
+</html>

@@ -13,10 +13,8 @@ DEFAULT_NUMBER_FACES = 5
 
 
 class Face_biometry:
-	def __init__(self, username: str):
-		self.username = username
-
-		self.faces = Faces(username=username)
+	def __init__(self):
+		self.faces = Faces(username='')
 
 	@staticmethod
 	def __take_shoot() -> (np.ndarray, list[list]):

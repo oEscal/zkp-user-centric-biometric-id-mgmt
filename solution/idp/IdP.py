@@ -50,18 +50,18 @@ class IdP(Asymmetric_IdP):
         super().__init__()
 
     @cherrypy.expose
-    def login(self):
+    def login(self, method='face'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
         # TODO -> MUDAR ISTO
-        zkp_values[client_id] = ZKP_IdP(method='face', key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
+        zkp_values[client_id] = ZKP_IdP(method=method, key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
         raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/authenticate",
                                                    params={
                                                        'max_iterations': MAX_ITERATIONS_ALLOWED,
                                                        'min_iterations': MIN_ITERATIONS_ALLOWED,
                                                        'client': client_id,
-                                                       'method': 'face',
+                                                       'method': method,
                                                        'key': base64.urlsafe_b64encode(aes_key),
                                                        'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
                                                        'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
