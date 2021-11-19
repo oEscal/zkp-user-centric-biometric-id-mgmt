@@ -1,51 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Select the IdP user</title>
-</head>
-<body>
-    <h1>Select the user you want to login with</h1>
+{% extends "base.html" %}
+{% block content %}
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <div class="row mb-4 px-3">
+            <h1 class="mb-0 mr-4 mt-2"><b>Select the user you want to login with:</b></h1>
+        </div>
+        <div class="row px-3 mb-4 ">
+            <div class="line" style="width: 100%"></div>
+        </div>
 
-    <form action="/select_idp_user" method="post">
-      <h3>Your local registered users in the Identity Provider '<a href="${idp}">${idp}</a>': </h3>
+        <form action="/select_idp_user" method="post">
+            <div class="row mb-4 px-3">
+                <h3 class="mb-0 mr-4 mt-2">&bull; Your local registered users in the Identity Provider '<a
+                        href="{{idp}}">{{idp}}</a>':
+                </h3>
+            </div>
 
-      % for user in users:
-      <label for="${user}">${user}</label>
-      <input type="radio" id="${user}" value="${user}" name="idp_user">
-        <br>
-      % endfor
+            <table class="table table-striped table-bordered">
+                <thead class="thead-dark">
+                <tr>
+                    <th scope="col">Username</th>
+                    <th scope="col" class="text-center">Selection</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for user in users %}
+                <tr>
+                    <td><label for="{{user}}">{{user}}</label></td>
+                    <td><input type="radio" id="{{user}}" value="{{user}}" name="idp_user">
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
 
-      <br>
-      <br>
+            <div class="row px-3 mb-4">
+                <input type="submit" value="Login" class="btn btn-blue btn-block text-center"/>
+            </div>
+        </form>
 
-    <input type="submit" value="Login" />
-    </form>
+        <div class="row px-3 mb-4 ">
+            <div class="line" style="width: 100%"></div>
+        </div>
+        <div class="row mb-4 px-3 d-flex justify-content-center">
+            <h1 class="mb-0 mr-4 mt-2"><b>OR</b></h1>
+        </div>
+        <div class="row px-3 mb-4 ">
+            <div class="line" style="width: 100%"></div>
+        </div>
 
-    <br>
-      <br>
-    <br>
-      <br>
-    <br>
-      <br>
+        <form action="/add_idp_user" method="post">
+            <div class="row mb-4 px-3">
+                <h3 class="mb-0 mr-4 mt-2">&bull; Register and login with a new user associated with the Identity
+                    Provider '<a
+                            href="{{idp}}">{{idp}}</a>':
+                </h3>
+            </div>
 
-    <form action="/add_idp_user" method="post">
-      <h3>Or register and login with a new user associated with the Identity Provider '<a href="${idp}">${idp}</a>': </h3>
+            <label for="username">Username: </label>
+            <input type="username" id="username" name="username"/>
 
-        <label for="username">Username: </label>
-        <input type="username" id="username" name="username" />
+            <label for="password">Password: </label>
+            <input type="password" id="password" name="password"/>
 
-        <label for="password">Password: </label>
-        <input type="password" id="password" name="password" />
+            <div class="row px-3 mb-4">
+                <input type="submit" value="Register and Login" class="btn btn-blue btn-block text-center"/>
+            </div>
 
-      <input type="submit" value="Register and Login" />
+        </form>
 
-        % if context.get('message', UNDEFINED) is not UNDEFINED:
-        <br>
-        <br>
-        <br>
-        <h4>${message}</h4>
-      % endif
-    </form>
-</body>
-</html>
+
+        <div class="row mb-4 px-3">
+            {% if message %}
+            <h4 class="mb-0 mr-4 mt-2">{{message}}</h4>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

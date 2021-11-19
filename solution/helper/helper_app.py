@@ -223,6 +223,10 @@ class HelperApp(object):
 
     @cherrypy.expose
     def keychain(self, username: str, password: str, action: str = 'auth'):
+        return self.jinja_env.get_template('select_idp_user.html').render(
+            idp='#VSKI',
+            users=['ola', 'adeus', 'O escaleira tem um penis deveras grande'])
+
         if cherrypy.request.method != 'POST':
             raise cherrypy.HTTPError(405)
 
@@ -231,13 +235,16 @@ class HelperApp(object):
         # verify master password
         self.master_password_manager = Master_Password_Manager(username=username, master_password=password)
         if not self.master_password_manager.login():
-            return Template(filename='helper/static/keychain.html').render(action=action,
-                                                                           message='Error: Unsuccessful login!')
+            return self.jinja_env.get_template('keychain.html').render(action=action,
+                                                                       message='Error: Unsuccessful login!')
 
         if action == 'auth':
-            return Template(filename='helper/static/select_idp_user.html').render(
+            return self.jinja_env.get_template('select_idp_user.html').render(
                 idp=self.idp,
                 users=self.master_password_manager.get_users_for_idp(self.idp))
+            # return Template(filename='helper/static/select_idp_user.html').render(
+            #     idp=self.idp,
+            #     users=self.master_password_manager.get_users_for_idp(self.idp))
         elif action == 'update':
             return Template(filename='helper/static/update.html').render()
         elif action == 'update_idp':
