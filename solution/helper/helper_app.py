@@ -29,6 +29,7 @@ class HelperApp(object):
         self.auth_url = ''
         self.save_pk_url = ''
         self.id_url = ''
+        self.auth_bio = ''
 
         self.idp_client = ''
         self.sp_client = ''
@@ -421,7 +422,7 @@ class HelperApp(object):
         self.zkp_auth()
 
     @cherrypy.expose
-    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url):
+    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url, auth_bio):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
@@ -433,6 +434,7 @@ class HelperApp(object):
         self.auth_url = auth_url
         self.save_pk_url = save_pk_url
         self.id_url = id_url
+        self.auth_bio = auth_bio
 
         if method == 'face':
             return Template(filename='helper/static/biometric_auth.html').render(idp=self.idp, method=method,
@@ -513,19 +515,30 @@ class HelperApp(object):
 
         if operation == 'verify':
             features = self.face_biometry.get_facial_features()
-            print(features)
+
+            id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
 
             ciphered_params = self.cipher_auth.create_response({
+                'id_attrs': id_attrs_b64.decode(),
                 'username': username,
                 'features': features
             })
 
-            response = requests.get(self.auth_url, params={
+            response = requests.get(self.auth_bio, params={
                 'client': self.idp_client,
                 **ciphered_params
             })
 
-            return response.status_code
+            if response.status_code != 200:
+                # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
+                print(f"Error status: {response.status_code}")
+                self.zkp_auth()
+            else:
+                response_dict = self.cipher_auth.decipher_response(response.json())
+                self.response_attrs_b64 = response_dict['response']
+                self.response_signature_b64 = response_dict['signature']
+
+            raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
 
 
 if __name__ == '__main__':

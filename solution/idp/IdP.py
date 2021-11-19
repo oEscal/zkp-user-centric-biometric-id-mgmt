@@ -65,7 +65,8 @@ class IdP(Asymmetric_IdP):
                                                        'key': base64.urlsafe_b64encode(aes_key),
                                                        'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
                                                        'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
-                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}"
+                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}",
+                                                       'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}"
                                                    }), 307)
 
         """
@@ -84,7 +85,17 @@ class IdP(Asymmetric_IdP):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def authenticate(self, **kwargs):
-        def set_username(request_args, current_zkp):
+        client_id = kwargs['client']
+        current_zkp = zkp_values[client_id]
+        request_args = current_zkp.decipher_response(kwargs)
+
+        # restart zkp
+        if 'restart' in request_args and request_args['restart']:
+            zkp_values[client_id] = ZKP_IdP(key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
+            current_zkp = zkp_values[client_id]
+
+        challenge = request_args['nonce'].encode()
+        if current_zkp.iteration < 2:
             if 'username' in request_args:
                 username = str(request_args['username'])
                 current_zkp.username = username
@@ -93,40 +104,15 @@ class IdP(Asymmetric_IdP):
                 del current_zkp
                 raise cherrypy.HTTPError(400,
                                          message='The first request to this endpoint must have the parameter username')
-
-        client_id = kwargs['client']
-        current_zkp = zkp_values[client_id]
-        request_args = current_zkp.decipher_response(kwargs)
-
-        method = current_zkp.method
-
-        if method == 'face':
-            set_username(request_args, current_zkp)
-
-            face_biometry = Face_biometry(current_zkp.username)
-            if face_biometry.verify_user(request_args['features']):
-                return {}
-            else:
-                raise cherrypy.HTTPError(401, message="Authentication failed")
-
-        elif method == 'zkp':
-            # restart zkp
-            if 'restart' in request_args and request_args['restart']:
-                zkp_values[client_id] = ZKP_IdP(key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
-                current_zkp = zkp_values[client_id]
-
-            challenge = request_args['nonce'].encode()
-            if current_zkp.iteration < 2:
-                set_username(request_args, current_zkp)
-                if 'iterations' in request_args:
-                    iterations = int(request_args['iterations'])
-                    if MIN_ITERATIONS_ALLOWED <= iterations <= MAX_ITERATIONS_ALLOWED:
-                        current_zkp.max_iterations = iterations
-                    else:
-                        del current_zkp
-                        raise cherrypy.HTTPError(406, message='The number of iterations does not met the defined range')
-            else:
-                current_zkp.verify_challenge_response(int(request_args['response']))
+            if 'iterations' in request_args:
+                iterations = int(request_args['iterations'])
+                if MIN_ITERATIONS_ALLOWED <= iterations <= MAX_ITERATIONS_ALLOWED:
+                    current_zkp.max_iterations = iterations
+                else:
+                    del current_zkp
+                    raise cherrypy.HTTPError(406, message='The number of iterations does not met the defined range')
+        else:
+            current_zkp.verify_challenge_response(int(request_args['response']))
 
             challenge_response = current_zkp.response(challenge)
             nonce = current_zkp.create_challenge()
@@ -160,6 +146,19 @@ class IdP(Asymmetric_IdP):
         else:
             raise cherrypy.HTTPError(401, message="ZKP protocol was not completed")
 
+    def __get_id_attrs(self, id_attrs_b64, username) -> (bytes, bytes):
+        id_attrs = json.loads(base64.urlsafe_b64decode(id_attrs_b64))
+
+        response_dict = dict()
+        if 'username' in id_attrs:
+            response_dict['username'] = username
+        '''add here more attributes if needed'''
+
+        response_b64 = base64.urlsafe_b64encode(json.dumps(response_dict).encode())
+        response_signature_b64 = base64.urlsafe_b64encode(self.sign(response_b64))
+
+        return response_b64, response_signature_b64
+
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def identification(self, **kwargs):
@@ -185,15 +184,7 @@ class IdP(Asymmetric_IdP):
                     del current_zkp
                     raise cherrypy.HTTPError(401, message="Authentication failed")
 
-                id_attrs = json.loads(base64.urlsafe_b64decode(id_attrs_b64))
-
-                response_dict = dict()
-                if 'username' in id_attrs:
-                    response_dict['username'] = username
-                '''add here more attributes if needed'''
-
-                response_b64 = base64.urlsafe_b64encode(json.dumps(response_dict).encode())
-                response_signature_b64 = base64.urlsafe_b64encode(self.sign(response_b64))
+                response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64, username)
 
                 aes_key = urandom(32)
                 iv = urandom(16)
@@ -204,8 +195,7 @@ class IdP(Asymmetric_IdP):
                 response = new_cipher.cipher_data({
                     'response': response_b64.decode(),
                     'signature': response_signature_b64.decode()
-                },
-                    iv=iv)
+                }, iv=iv)
 
                 return current_zkp.create_response({
                     'ciphered_aes_key': ciphered_aes_key.decode(),
@@ -216,6 +206,32 @@ class IdP(Asymmetric_IdP):
                 raise cherrypy.HTTPError(410, message="Expired key")
         else:
             raise cherrypy.HTTPError(424, message="No public key for the given user id and username")
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def biometric_authentication(self, **kwargs):
+        client_id = kwargs['client']
+        current_zkp = zkp_values[client_id]
+        request_args = current_zkp.decipher_response(kwargs)
+
+        username = request_args['username']
+        id_attrs_b64 = request_args['id_attrs'].encode()
+
+        response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64=id_attrs_b64, username=username)
+
+        method = current_zkp.method
+
+        if method == 'face':
+            face_biometry = Face_biometry(username)
+            if face_biometry.verify_user(request_args['features']):
+                return current_zkp.create_response({
+                    'response': response_b64.decode(),
+                    'signature': response_signature_b64.decode()
+                })
+            else:
+                raise cherrypy.HTTPError(401, message="Authentication failed")
+        else:
+            raise cherrypy.HTTPError(403, message="Authentication method does not correspond with this endpoint")
 
 
 if __name__ == '__main__':

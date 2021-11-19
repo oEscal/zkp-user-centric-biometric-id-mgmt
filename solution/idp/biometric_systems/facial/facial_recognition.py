@@ -16,5 +16,6 @@ class Face_biometry:
 
 	def verify_user(self, face_features: list[float], tolerance=0.4) -> bool:
 		all_verifications = self.faces.verify_user(np.array(face_features))
+		print(all_verifications)
 
 		return all_verifications <= tolerance
