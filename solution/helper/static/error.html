@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Error</title>
-</head>
-<body>
-    <h1>Error:</h1>
-    <h4>${message}</h4>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <h1 style="color: #bd1717;"><b>Error:</b></h1>
+        <h4>{{message}}</h4>
+    </div>
+</div>
+{% endblock %}

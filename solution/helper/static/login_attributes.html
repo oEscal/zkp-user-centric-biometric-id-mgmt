@@ -1,37 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Permission Request</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <h1>Permission Request</h1>
 
-<h1>Permission Request</h1>
+        <form action="/authorize_attr_request" method="post">
+            <input type="hidden" name="client" value="{{client}}"/>
+            <input type="hidden" name="consumer_url" value="{{consumer_url}}"/>
+            <input type="hidden" name="sp" value="{{sp}}"/>
+            <input type="hidden" name="idp" value="{{idp}}"/>
+            <input type="hidden" name="sso_url" value="{{sso_url}}"/>
 
-<form action="/authorize_attr_request" method="post">
-    <input type="hidden" name="client" value="${client}"/>
-    <input type="hidden" name="consumer_url" value="${consumer_url}"/>
-    <input type="hidden" name="sp" value="${sp}"/>
-    <input type="hidden" name="idp" value="${idp}"/>
-    <input type="hidden" name="sso_url" value="${sso_url}"/>
+            <h4>The Service Provider '<a href="{{sp}}">{{sp}}</a>' requested permission to access the following
+                information:
+            </h4>
 
-    <h4>The Service Provider '<a href="${sp}">${sp}</a>' requested permission to access the following information:
-    </h4>
+            <input type="hidden" name="id_attrs" value=""/>
+            <ul>
+                {% for attr in id_attrs %}
+                <li>{{attr}}</li>
+                <input type="hidden" name="id_attrs" value="{{attr}}"/>
+                {% endfor %}
+            </ul>
 
-    <input type="hidden" name="id_attrs" value=""/>
-    <ul>
-        % for attr in id_attrs:
-        <li>${attr}</li>
-        <input type="hidden" name="id_attrs" value="${attr}"/>
-        % endfor
-    </ul>
+            <h4>This information will be requested to the Identity Provider '<a href="{{idp}}">{{idp}}</a>'.
+            </h4>
 
-    <h4>This information will be requested to the Identity Provider '<a href="${idp}">${idp}</a>'.
-    </h4>
+            <div class="row mb-6 px-3">
+                <button type="submit" class="btn btn-success text-center" name="allow">Allow</button>
+                &nbsp;
+                <button type="submit" class="btn btn-danger text-center" name="deny">Deny</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-    <button type="submit" name="allow">Allow</button>
-    <button type="submit" name="deny">Deny</button>
-</form>
-
-</body>
-</html>
+{% endblock %}

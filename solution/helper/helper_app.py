@@ -9,6 +9,7 @@ from mako.template import Template
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
+from jinja2 import Environment, FileSystemLoader
 
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
@@ -41,6 +42,8 @@ class HelperApp(object):
 
         self.response_attrs_b64 = ''
         self.response_signature_b64 = ''
+
+        self.jinja_env = Environment(loader=FileSystemLoader('helper/static'))
 
     @staticmethod
     def static_contents(path):
@@ -78,21 +81,21 @@ class HelperApp(object):
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
                                  "this is the IdP we are contacting is not a trusted one!"
         }
-        return Template(filename='helper/static/error.html').render(message=errors[error_id])
+        return self.jinja_env.get_template('error.html').render(message=errors[error_id])
 
     @cherrypy.expose
     def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str):
         self.__init__()
         attrs = id_attrs.split(',')
-        return Template(filename='helper/static/login_attributes.html').render(sp=sp, idp=idp, id_attrs=attrs,
-                                                                               sso_url=sso_url,
-                                                                               consumer_url=consumer_url, client=client)
+        return self.jinja_env.get_template('login_attributes.html').render(sp=sp, idp=idp, id_attrs=attrs,
+                                                                           sso_url=sso_url, consumer_url=consumer_url,
+                                                                           client=client)
 
     @cherrypy.expose
     def authorize_attr_request(self, sp: str, idp: str, id_attrs: list, consumer_url: str, sso_url: str, client: str,
                                **kwargs):
         if 'deny' in kwargs:
-            return Template(filename='helper/static/auth_refused.html').render()
+            return self.jinja_env.get_template('auth_refused.html').render()
         elif 'allow' in kwargs:
             self.sp = sp
             self.idp = idp
