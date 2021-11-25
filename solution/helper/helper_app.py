@@ -399,13 +399,13 @@ class HelperApp(object):
     @cherrypy.expose
     def attribute_presentation(self):
         response_attrs = json.loads(base64.b64decode(self.response_attrs_b64))
-        return Template(filename='helper/static/attr_presentation.html').render(idp=self.idp, sp=self.sp,
-                                                                                response_attrs=response_attrs)
+        return self.jinja_env.get_template('attr_presentation.html').render(idp=self.idp, sp=self.sp,
+                                                                            response_attrs=response_attrs)
 
     @cherrypy.expose
     def authorize_attr_response(self, **kwargs):
         if 'deny' in kwargs:
-            return Template(filename='helper/static/auth_refused.html').render()
+            return self.jinja_env.get_template('auth_refused.html').render()
         elif 'allow' in kwargs:
             return Template(filename='helper/static/post_id_attr.html').render(consumer_url=self.consumer_url,
                                                                                response=self.response_attrs_b64,
