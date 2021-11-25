@@ -1,22 +1,19 @@
-import base64
-import json
-
 import cv2
 import face_recognition
 import numpy as np
-
-from helper.biometric_systems.facial.face import get_features_from_face, Faces
 
 faceCascade = cv2.CascadeClassifier(f'{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml')
 
 DEFAULT_NUMBER_FACES = 5
 
 
-class Face_biometry:
-	def __init__(self, username: str):
-		self.username = username
+def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> list[float]:
+	return face_recognition.face_encodings(frame, known_face_locations=face_locations, model='large')[0].tolist()
 
-		self.faces = Faces(username=username)
+
+class Face_biometry:
+	def __init__(self):
+		pass
 
 	@staticmethod
 	def __take_shoot() -> (np.ndarray, list[list]):
@@ -65,30 +62,6 @@ class Face_biometry:
 				return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 			"""
 
-	def register_new_user(self):
-		for i in range(DEFAULT_NUMBER_FACES):
-			frame, face_locations = self.__take_shoot()
-			face_features = get_features_from_face(frame=frame, face_locations=face_locations)
-
-			self.faces.add(new_face_features=face_features)
-		self.faces.save_faces()
-		print("All facial features saved with success")
-
 	def get_facial_features(self) -> list[float]:
 		frame, face_locations = self.__take_shoot()
 		return get_features_from_face(frame=frame, face_locations=face_locations)
-
-	def verify_user(self, face_features: list[float]):
-		all_verifications = self.faces.verify_user(face_features)
-
-		true_ctr = 0
-		false_ctr = 0
-		for verification in all_verifications:
-			if verification:
-				true_ctr += 1
-			else:
-				false_ctr += 1
-
-		print(f"True percentage: {true_ctr / len(all_verifications) * 100}%")
-		print(f"False percentage: {false_ctr / len(all_verifications) * 100}%")
-		return true_ctr / len(all_verifications)

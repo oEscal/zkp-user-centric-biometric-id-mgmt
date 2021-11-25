@@ -507,11 +507,15 @@ class HelperApp(object):
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
+    def biometric_registration(self):
+        pass
+
+    @cherrypy.expose
     def biometric_face(self, username, operation):
         if cherrypy.request.method != 'POST':
             raise cherrypy.HTTPError(405)
 
-        self.face_biometry = Face_biometry(username)
+        self.face_biometry = Face_biometry()
 
         if operation == 'verify':
             features = self.face_biometry.get_facial_features()
@@ -528,6 +532,8 @@ class HelperApp(object):
                 'client': self.idp_client,
                 **ciphered_params
             })
+
+            print(f"\n\n\n{response.status_code}\n\n\n")
 
             if response.status_code != 200:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
