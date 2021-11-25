@@ -1,5 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
+{% if message %}
+<div class="modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><b>Message</b></h5>
+            </div>
+            <div class="modal-body">
+                <p>{{message}}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="close_modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('.modal').modal('show');
+    $('#close_modal').on('click', () => {
+        $('.modal').modal('hide');
+    })
+</script>
+{% endif %}
+
 <div class="col-lg-12">
     <div class="card2 card border-0 px-4 py-5">
         <div class="row mb-4 px-3">
@@ -69,12 +93,6 @@
 
         </form>
 
-
-        <div class="row mb-4 px-3">
-            {% if message %}
-            <h4 class="mb-0 mr-4 mt-2">{{message}}</h4>
-            {% endif %}
-        </div>
     </div>
 </div>
 {% endblock %}

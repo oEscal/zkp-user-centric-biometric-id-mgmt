@@ -223,10 +223,6 @@ class HelperApp(object):
 
     @cherrypy.expose
     def keychain(self, username: str, password: str, action: str = 'auth'):
-        return self.jinja_env.get_template('select_idp_user.html').render(
-            idp='#VSKI',
-            users=['ola', 'adeus', 'O escaleira tem um penis deveras grande'])
-
         if cherrypy.request.method != 'POST':
             raise cherrypy.HTTPError(405)
 
@@ -242,11 +238,8 @@ class HelperApp(object):
             return self.jinja_env.get_template('select_idp_user.html').render(
                 idp=self.idp,
                 users=self.master_password_manager.get_users_for_idp(self.idp))
-            # return Template(filename='helper/static/select_idp_user.html').render(
-            #     idp=self.idp,
-            #     users=self.master_password_manager.get_users_for_idp(self.idp))
         elif action == 'update':
-            return Template(filename='helper/static/update.html').render()
+            return self.jinja_env.get_template('update.html').render()
         elif action == 'update_idp':
             raise cherrypy.HTTPRedirect("/update_idp_credentials", 301)
         else:
@@ -280,14 +273,15 @@ class HelperApp(object):
             raise cherrypy.HTTPError(405)
 
         if not username or not password:
-            return Template(filename='helper/static/select_idp_user.html').render(
+            return self.jinja_env.get_template("select_idp_user.html").render(
                 idp=self.idp,
                 users=self.master_password_manager.get_users_for_idp(self.idp),
-                message='Error: You must enter a new username with a password!')
+                message='Error: You must enter a new username with a password!'
+            )
 
         # update keychain registered idp users
         if not self.master_password_manager.add_idp_user(idp_user=username, idp=self.idp):
-            return Template(filename='helper/static/select_idp_user.html').render(
+            return self.jinja_env.get_template(filename='select_idp_user.html').render(
                 idp=self.idp,
                 users=self.master_password_manager.get_users_for_idp(self.idp),
                 message='Error: Error registering the new user!')
@@ -304,14 +298,14 @@ class HelperApp(object):
     def update_idp_credentials(self, **kwargs):
         # verify if the user is authenticated
         if not self.master_password_manager:
-            return Template(filename='helper/static/keychain.html').render(action='update_idp')
+            return self.jinja_env.get_template('keychain.html').render(action='update_idp')
 
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/update_idp_cred.html').render(
+            return self.jinja_env.get_template('update_idp_cred.html').render(
                 idps=self.master_password_manager.idps)
         elif cherrypy.request.method == 'POST':
             if 'idp_user' not in kwargs:
-                return Template(filename='helper/static/update_idp_cred.html').render(
+                return self.jinja_env.get_template('update_idp_cred.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must select a user to update!")
 
@@ -327,7 +321,7 @@ class HelperApp(object):
             if not message:
                 message = 'Success: The user was updated with success'
 
-            return Template(filename='helper/static/update_idp_cred.html').render(
+            return self.jinja_env.get_template('update_idp_cred.html').render(
                 idps=self.master_password_manager.idps,
                 message=message)
         else:
@@ -338,14 +332,14 @@ class HelperApp(object):
         idp_user = self.password_manager.idp_username
 
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/update_idp_user.html').render(idp=self.idp, user=idp_user)
+            return self.jinja_env.get_template('update_idp_user.html').render(idp=self.idp, user=idp_user)
         elif cherrypy.request.method == 'POST':
             message = self.update_idp_user_credentials(idp_user=idp_user, idp=self.idp,
                                                        username=kwargs['username'] if 'username' in kwargs else '',
                                                        password=kwargs['password'] if 'password' in kwargs else '')
             if message:
-                return Template(filename='helper/static/update_idp_user.html').render(idp=self.idp, user=idp_user,
-                                                                                      message=message)
+                return self.jinja_env.get_template('update_idp_user.html').render(idp=self.idp, user=idp_user,
+                                                                                  message=message)
 
             self.zkp_auth(restart=True)
         else:
@@ -379,7 +373,7 @@ class HelperApp(object):
     @cherrypy.expose
     def update(self, **kwargs):
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/keychain.html').render(action='update')
+            return self.jinja_env.get_template('keychain.html').render(action='update')
         elif cherrypy.request.method == 'POST':
             username = ''
             password = ''
@@ -390,14 +384,14 @@ class HelperApp(object):
 
             prev_username = self.master_password_manager.username
             if not self.master_password_manager.update_user(new_username=username, new_password=password):
-                return Template(filename='helper/static/update.html').render(message='Error: Error updating the user!')
+                return self.jinja_env.get_template('update.html').render(message='Error: Error updating the user!')
 
             # update the key files
             if username:
                 Password_Manager.update_keychain_user(prev_username=prev_username, new_username=username,
                                                       idps=self.master_password_manager.idps)
 
-            return Template(filename='helper/static/update.html').render(
+            return self.jinja_env.get_template('update.html').render(
                 message='Success: The user was updated with success')
         else:
             raise cherrypy.HTTPError(405)
