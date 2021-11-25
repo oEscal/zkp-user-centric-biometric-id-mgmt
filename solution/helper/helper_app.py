@@ -45,6 +45,7 @@ class HelperApp(object):
         self.response_signature_b64 = ''
 
         self.face_biometry: Face_biometry = None    # = Face_biometry('escaleira')
+        self.register_biometric = False
 
     @staticmethod
     def static_contents(path):
@@ -243,6 +244,8 @@ class HelperApp(object):
             return Template(filename='helper/static/update.html').render()
         elif action == 'update_idp':
             raise cherrypy.HTTPRedirect("/update_idp_credentials", 301)
+        elif action == 'biometric_register':
+            raise cherrypy.HTTPRedirect("/biometric_register", 301)
         else:
             raise cherrypy.HTTPError(401)
 
@@ -452,7 +455,17 @@ class HelperApp(object):
                 raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
                                                            params={'error_id': 'idp_iterations'}), 301)
 
-            return Template(filename='helper/static/keychain.html').render(action='auth')
+            # verify if the user is authenticated
+            if not self.master_password_manager:
+                return Template(filename='helper/static/keychain.html').render(action='auth')
+
+            if self.biometric_register:
+                raise cherrypy.HTTPRedirect(create_get_url("/biometric_face",
+                                                           params={'username': '', 'operation': 'register'}), 301)
+
+            return Template(filename='helper/static/select_idp_user.html').render(
+                idp=self.idp,
+                users=self.master_password_manager.get_users_for_idp(self.idp))
 
     @cherrypy.expose
     def choose_iterations(self, **kwargs):
@@ -507,8 +520,49 @@ class HelperApp(object):
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
-    def biometric_registration(self):
-        pass
+    def biometric_register(self, **kwargs):
+        # verify if the user is authenticated
+        if not self.master_password_manager:
+            return Template(filename='helper/static/keychain.html').render(action='biometric_register')
+
+        if cherrypy.request.method == 'GET':
+            return Template(filename='helper/static/biometric_register.html').render(
+                idps=self.master_password_manager.idps)
+        elif cherrypy.request.method == 'POST':
+            if 'idp_user' not in kwargs:
+                return Template(filename='helper/static/biometric_register.html').render(
+                    idps=self.master_password_manager.idps,
+                    message="Error: You must select a user to update!")
+
+            indexes = [int(v) for v in kwargs['idp_user'].split('_')]
+
+            selected_idp = list(self.master_password_manager.idps.keys())[indexes[0]]
+            selected_user = self.master_password_manager.idps[selected_idp][indexes[1]]
+
+            # TODO -> VER ISTO
+            self.sso_url = f"{selected_idp}/login"
+            self.idp = selected_idp
+
+            self.register_biometric = True
+            master_username = self.master_password_manager.username
+            master_password = self.master_password_manager.master_password
+            self.password_manager = Password_Manager(master_username=master_username, master_password=master_password,
+                                                     idp_user=selected_user, idp=self.idp)
+
+            raise cherrypy.HTTPRedirect(self.sso_url, status=303)
+
+            message = self.update_idp_user_credentials(idp_user=selected_user, idp=selected_idp,
+                                                       username=kwargs['username'] if 'username' in kwargs else '',
+                                                       password=kwargs['password'] if 'password' in kwargs else '')
+
+            if not message:
+                message = 'Success: The user was updated with success'
+
+            return Template(filename='helper/static/update_idp_cred.html').render(
+                idps=self.master_password_manager.idps,
+                message=message)
+        else:
+            raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
     def biometric_face(self, username, operation):
@@ -545,6 +599,8 @@ class HelperApp(object):
                 self.response_signature_b64 = response_dict['signature']
 
             raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
+        elif operation == 'register':
+            pass
 
 
 if __name__ == '__main__':
