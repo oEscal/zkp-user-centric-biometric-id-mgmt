@@ -29,6 +29,7 @@ def get_user_key(id: str, username: str) -> tuple[bytes]:
 
 
 def save_faces(username: str, faces: bytes) -> bool:
+    print(username)
     try:
         with sqlite3.connect(DB_NAME) as con:
             con.execute("UPDATE user SET faces=? WHERE username=?",

@@ -67,7 +67,8 @@ class IdP(Asymmetric_IdP):
                                                        'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
                                                        'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
                                                        'id_url': f"{HOST_URL}/{self.identification.__name__}",
-                                                       'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}"
+                                                       'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}",
+                                                       'reg_bio': f"{HOST_URL}/{self.biometric_register.__name__}",
                                                    }), 307)
 
         """
@@ -238,12 +239,24 @@ class IdP(Asymmetric_IdP):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def biometric_register(self, method: str, **kwargs):
+        # TODO -> COLOCAR ISTO EM POST
         client_id = kwargs['client']
         current_zkp = zkp_values[client_id]
+        request_args = current_zkp.decipher_response(kwargs)
 
         if current_zkp.iteration >= current_zkp.max_iterations * 2 and current_zkp.all_ok:
-            face_biometry = Face_biometry(current_zkp.username, save_faces_funct=save_faces, get_faces_funct=get_faces)
+            if method == 'face':
+                face_biometry = Face_biometry(current_zkp.username, save_faces_funct=save_faces,
+                                              get_faces_funct=get_faces)
+
+                status = face_biometry.register_new_user(faces_features=request_args['features'])
+
+                return current_zkp.create_response({
+                    'status': status,
+                })
         else:
+            print(current_zkp.iteration)
+            print(current_zkp.all_ok)
             raise cherrypy.HTTPError(401, message="ZKP protocol was not completed")
 
 

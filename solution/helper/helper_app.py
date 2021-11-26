@@ -14,7 +14,7 @@ from helper.managers import Master_Password_Manager, Password_Manager
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
-NUMBER_FACES_REGISTER = 7
+NUMBER_FACES_REGISTER = 1
 
 
 class HelperApp(object):
@@ -32,6 +32,7 @@ class HelperApp(object):
         self.save_pk_url = ''
         self.id_url = ''
         self.auth_bio = ''
+        self.reg_bio = ''
 
         self.idp_client = ''
         self.sp_client = ''
@@ -432,7 +433,8 @@ class HelperApp(object):
         self.zkp_auth()
 
     @cherrypy.expose
-    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url, auth_bio):
+    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url, auth_bio,
+                     reg_bio):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
@@ -445,6 +447,7 @@ class HelperApp(object):
         self.save_pk_url = save_pk_url
         self.id_url = id_url
         self.auth_bio = auth_bio
+        self.reg_bio = reg_bio
 
         if method == 'face':
             return Template(filename='helper/static/biometric_auth.html').render(idp=self.idp, method=method,
@@ -600,8 +603,6 @@ class HelperApp(object):
                 **ciphered_params
             })
 
-            print(f"\n\n\n{response.status_code}\n\n\n")
-
             if response.status_code != 200:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
@@ -619,7 +620,22 @@ class HelperApp(object):
             for i in range(NUMBER_FACES_REGISTER):
                 features.append(self.face_biometry.get_facial_features())
 
-            return 'ola'
+            ciphered_params = self.cipher_auth.create_response({
+                'features': features
+            })
+
+            print(self.reg_bio)
+            response = requests.get(self.reg_bio, params={
+                'client': self.idp_client,
+                'method': 'face',
+                **ciphered_params
+            })
+
+            if response.status_code != 200:
+                # TODO ->  ANALISAR MENSAGEM DE ERRO
+                return 'False'
+            else:
+                return 'Success'
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
