@@ -7,7 +7,7 @@ DB_NAME = 'idp/idp.db'
 def get_user(username: str) -> tuple:
     with sqlite3.connect(DB_NAME) as con:
         r = con.execute("SELECT password FROM user WHERE username=?",
-                      [username])
+                        [username])
         return r.fetchone()
 
 
@@ -22,9 +22,26 @@ def save_user_key(id: str, username: str, key: str, not_valid_after: float) -> b
         return False
 
 
-def get_user_key(id: str, username: str) -> tuple:
+def get_user_key(id: str, username: str) -> tuple[bytes]:
     with sqlite3.connect(DB_NAME) as con:
         r = con.execute("SELECT value, not_valid_after FROM keys WHERE id=? AND user=?", [id, username])
+        return r.fetchone()
+
+
+def save_faces(username: str, faces: bytes) -> bool:
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute("UPDATE user SET faces=? WHERE username=?",
+                        [faces, username])
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def get_faces(username):
+    with sqlite3.connect(DB_NAME) as con:
+        r = con.execute("SELECT faces FROM user WHERE user=?", [username])
         return r.fetchone()
 
 
@@ -32,7 +49,9 @@ def setup_database():
     with sqlite3.connect(DB_NAME) as con:
         con.execute("CREATE TABLE if not exists user ("
                     "username text primary key,"
-                    "password text not null"
+                    "password text not null,"
+                    "faces blob,"
+                    "fingerprints blob"
                     ")")
         con.execute("CREATE TABLE if not exists keys ("
                     "id text primary key,"

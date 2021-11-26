@@ -1,3 +1,5 @@
+from typing import Callable
+
 import cv2
 import numpy as np
 
@@ -9,14 +11,15 @@ DEFAULT_NUMBER_FACES = 5
 
 
 class Face_biometry:
-	def __init__(self, username: str):
+	def __init__(self, username: str, save_faces_funct: Callable[[str, bytes], bool],
+				 get_faces_funct: Callable[[str], tuple[bytes]]):
 		self.username = username
 
-		self.faces = Faces(username=username)
+		self.faces = Faces(username=username, save_faces_funct=save_faces_funct, get_faces_funct=get_faces_funct)
 
 	def register_new_user(self):
 		for i in range(DEFAULT_NUMBER_FACES):
-			frame, face_locations = () # self.__take_shoot()
+			frame, face_locations = ()		# self.__take_shoot()
 			face_features = get_features_from_face(frame=frame, face_locations=face_locations)
 
 			self.faces.add(new_face_features=face_features)

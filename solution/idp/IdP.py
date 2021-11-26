@@ -11,10 +11,11 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 
 from idp.biometric_systems.facial.facial_recognition import Face_biometry
-from idp.queries import setup_database, get_user, save_user_key, get_user_key
+from idp.queries import setup_database, get_user, save_user_key, get_user_key, save_faces, get_faces
 from utils.utils import ZKP_IdP, asymmetric_padding_signature, asymmetric_hash, create_get_url, \
     Cipher_Authentication, \
     asymmetric_upload_derivation_key, asymmetric_padding_encryption
+
 
 HOST_NAME = '127.0.0.1'
 HOST_PORT = 8082
@@ -223,7 +224,7 @@ class IdP(Asymmetric_IdP):
         method = current_zkp.method
 
         if method == 'face':
-            face_biometry = Face_biometry(username)
+            face_biometry = Face_biometry(username, save_faces_funct=save_faces, get_faces_funct=get_faces)
             if face_biometry.verify_user(request_args['features']):
                 return current_zkp.create_response({
                     'response': response_b64.decode(),
@@ -233,6 +234,17 @@ class IdP(Asymmetric_IdP):
                 raise cherrypy.HTTPError(401, message="Authentication failed")
         else:
             raise cherrypy.HTTPError(403, message="Authentication method does not correspond with this endpoint")
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def biometric_register(self, method: str, **kwargs):
+        client_id = kwargs['client']
+        current_zkp = zkp_values[client_id]
+
+        if current_zkp.iteration >= current_zkp.max_iterations * 2 and current_zkp.all_ok:
+            face_biometry = Face_biometry(current_zkp.username, save_faces_funct=save_faces, get_faces_funct=get_faces)
+        else:
+            raise cherrypy.HTTPError(401, message="ZKP protocol was not completed")
 
 
 if __name__ == '__main__':
