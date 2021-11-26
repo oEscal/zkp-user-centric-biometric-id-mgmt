@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Biometric Authentication</title>
+</head>
+<body>
+<form action="/biometric_${method}" method="post">
+      <h3>Your user for the Identity Provider '<a href="${idp}">${idp}</a>': </h3>
+        <input hidden="text" id="operation" name="operation" value="${operation}" />
+
+        <label for="username">Username: </label>
+        <input type="username" id="username" name="username" />
+
+      <input type="submit" value="Login using biometrics" />
+
+        % if context.get('message', UNDEFINED) is not UNDEFINED:
+        <br>
+        <br>
+        <br>
+        <h4>${message}</h4>
+      % endif
+    </form>
+</body>
+</html>

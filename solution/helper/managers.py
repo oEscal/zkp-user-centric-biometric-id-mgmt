@@ -13,10 +13,9 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from utils.utils import create_directory, aes_cipher, asymmetric_padding_signature, asymmetric_hash, \
-	aes_key_derivation, asymmetric_padding_encryption
+    aes_key_derivation, asymmetric_padding_encryption
 
-
-KEYS_DIRECTORY = 'helper_keys'
+KEYS_DIRECTORY = 'helper/helper_keys'
 INITIALIZATION_VECTOR_SIZE = 16
 AES_KEY_SALT_SIZE = 16
 
@@ -216,7 +215,8 @@ class Password_Manager(object):
 
     def load_private_key(self, no_time_verification=False) -> bool:
         try:
-            with open(f"{KEYS_DIRECTORY}/{self.idp_username}_{self.master_username}_{self.idp_base64}.pem", 'rb') as file:
+            with open(f"{KEYS_DIRECTORY}/{self.idp_username}_{self.master_username}_{self.idp_base64}.pem",
+                      'rb') as file:
                 self.user_id = file.readline().decode().rstrip()
                 self.time_to_live = float(file.readline())
                 self.salt_private_key = file.read(AES_KEY_SALT_SIZE)
@@ -243,9 +243,10 @@ class Password_Manager(object):
         salt_password = urandom(AES_KEY_SALT_SIZE)
         key = aes_key_derivation(self.master_password, salt_password)
         encryptor = aes_cipher(key=key, iv=iv).encryptor()
-        with open(f"{KEYS_DIRECTORY}/{self.idp_username}_secret_{self.master_username}_{self.idp_base64}", "wb") as file:
-            file.write(salt_password)                       # first AES_KEY_SALT_SIZE bytes
-            file.write(iv)                                  # first INITIALIZATION_VECTOR_SIZE bytes
+        with open(f"{KEYS_DIRECTORY}/{self.idp_username}_secret_{self.master_username}_{self.idp_base64}",
+                  "wb") as file:
+            file.write(salt_password)  # first AES_KEY_SALT_SIZE bytes
+            file.write(iv)  # first INITIALIZATION_VECTOR_SIZE bytes
 
             block_size = algorithms.AES(key).block_size
             padder = padding.PKCS7(block_size).padder()
@@ -327,7 +328,8 @@ class Password_Manager(object):
 
         if private_key_load_success:
             self.salt_private_key = urandom(AES_KEY_SALT_SIZE)
-            with open(f"{KEYS_DIRECTORY}/{self.idp_username}_{self.master_username}_{self.idp_base64}.pem", 'wb') as file:
+            with open(f"{KEYS_DIRECTORY}/{self.idp_username}_{self.master_username}_{self.idp_base64}.pem",
+                      'wb') as file:
                 file.write(f"{self.user_id}\n".encode())
                 file.write(f"{self.time_to_live}\n".encode())
                 file.write(self.salt_private_key)  # first AES_KEY_SALT_SIZE bytes
