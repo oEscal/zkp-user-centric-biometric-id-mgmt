@@ -91,7 +91,8 @@ class IdP(Asymmetric_IdP):
 
         # restart zkp
         if 'restart' in request_args and request_args['restart']:
-            zkp_values[client_id] = ZKP_IdP(key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
+            zkp_values[client_id] = ZKP_IdP(method=current_zkp.method, key=current_zkp.key,
+                                            max_iterations=MAX_ITERATIONS_ALLOWED)
             current_zkp = zkp_values[client_id]
 
         challenge = request_args['nonce'].encode()
@@ -114,13 +115,13 @@ class IdP(Asymmetric_IdP):
         else:
             current_zkp.verify_challenge_response(int(request_args['response']))
 
-            challenge_response = current_zkp.response(challenge)
-            nonce = current_zkp.create_challenge()
+        challenge_response = current_zkp.response(challenge)
+        nonce = current_zkp.create_challenge()
 
-            return current_zkp.create_response({
-                'nonce': nonce,
-                'response': challenge_response
-            })
+        return current_zkp.create_response({
+            'nonce': nonce,
+            'response': challenge_response
+        })
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

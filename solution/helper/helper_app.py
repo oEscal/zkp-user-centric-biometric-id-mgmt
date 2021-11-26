@@ -46,6 +46,7 @@ class HelperApp(object):
 
         self.face_biometry: Face_biometry = None    # = Face_biometry('escaleira')
         self.register_biometric = False
+        self.registration_method = ''
 
     @staticmethod
     def static_contents(path):
@@ -220,8 +221,12 @@ class HelperApp(object):
             raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
                                                        params={'error_id': 'zkp_auth_error'}), 301)
 
-        # in the end, we request the attributes with the new key pair
-        self.asymmetric_identification()
+        # if the authentication is done for the registration with biometrics, redirect
+        if self.register_biometric:
+            self.__biometric_registration_final()
+        else:
+            # in the end, we request the attributes with the new key pair
+            self.asymmetric_identification()
 
     @cherrypy.expose
     def keychain(self, username: str, password: str, action: str = 'auth'):
@@ -459,9 +464,10 @@ class HelperApp(object):
             if not self.master_password_manager:
                 return Template(filename='helper/static/keychain.html').render(action='auth')
 
-            if self.biometric_register:
-                raise cherrypy.HTTPRedirect(create_get_url("/biometric_face",
-                                                           params={'username': '', 'operation': 'register'}), 301)
+            if self.register_biometric:
+                self.zkp_auth()
+                # raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
+                #                                            params={'username': '', 'operation': 'register'}), 301)
 
             return Template(filename='helper/static/select_idp_user.html').render(
                 idp=self.idp,
@@ -533,6 +539,10 @@ class HelperApp(object):
                 return Template(filename='helper/static/biometric_register.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must select a user to update!")
+            elif 'method' not in kwargs:
+                return Template(filename='helper/static/biometric_register.html').render(
+                    idps=self.master_password_manager.idps,
+                    message="Error: You must select the biometric method you want to register with!")
 
             indexes = [int(v) for v in kwargs['idp_user'].split('_')]
 
@@ -549,18 +559,9 @@ class HelperApp(object):
             self.password_manager = Password_Manager(master_username=master_username, master_password=master_password,
                                                      idp_user=selected_user, idp=self.idp)
 
-            raise cherrypy.HTTPRedirect(self.sso_url, status=303)
+            self.registration_method = kwargs['method']
 
-            message = self.update_idp_user_credentials(idp_user=selected_user, idp=selected_idp,
-                                                       username=kwargs['username'] if 'username' in kwargs else '',
-                                                       password=kwargs['password'] if 'password' in kwargs else '')
-
-            if not message:
-                message = 'Success: The user was updated with success'
-
-            return Template(filename='helper/static/update_idp_cred.html').render(
-                idps=self.master_password_manager.idps,
-                message=message)
+            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={'method': 'zkp'}), status=303)
         else:
             raise cherrypy.HTTPError(405)
 
@@ -600,7 +601,16 @@ class HelperApp(object):
 
             raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
         elif operation == 'register':
-            pass
+            self.register_biometric = False
+            features = self.face_biometry.get_facial_features()
+            print(features)
+            return 'ola'
+
+    def __biometric_registration_final(self):
+        if self.registration_method == 'face':
+            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
+                                                       params={'username': '', 'operation': 'register'}), 301)
+
 
 
 if __name__ == '__main__':

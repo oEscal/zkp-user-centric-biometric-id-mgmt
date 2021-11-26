@@ -7,7 +7,7 @@
 <body>
 <h1>Register using biometrics</h1>
 
-<form action="/update_idp_credentials" method="post">
+<form action="/biometric_register" method="post">
 
     <h2>Select the biometric method to register with:</h2>
     <label for="face">Face</label>
@@ -30,7 +30,7 @@
     % endfor
 
     <br>
-    <input type="submit" value="Update"/>
+    <input type="submit" value="Register"/>
     % if context.get('message', UNDEFINED) is not UNDEFINED:
     <br>
     <br>
