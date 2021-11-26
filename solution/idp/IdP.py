@@ -56,7 +56,7 @@ class IdP(Asymmetric_IdP):
     def index(self):
         user_id = cherrypy.session.get('user_id')
         if not user_id:
-            raise cherrypy.HTTPRedirect('/login')
+            raise cherrypy.HTTPRedirect('/login_locally')
 
         raise cherrypy.HTTPRedirect('/account')
 
@@ -66,9 +66,9 @@ class IdP(Asymmetric_IdP):
         cherrypy.session.clear()
         raise cherrypy.HTTPRedirect('/')
 
-    # @cherrypy.expose
-    # def login(self):
-    #     return self.jinja_env.get_template('login.html').render()
+    @cherrypy.expose
+    def login_locally(self):
+        return self.jinja_env.get_template('login.html').render()
 
     @cherrypy.expose
     def sign_up(self):
@@ -78,14 +78,13 @@ class IdP(Asymmetric_IdP):
     def account(self):
         user_id = cherrypy.session.get('user_id')
         if not user_id:
-            raise cherrypy.HTTPRedirect('/login')
+            raise cherrypy.HTTPRedirect('/login_locally')
 
         user = get_user(user_id, 'id', as_dict=True)
         template = self.jinja_env.get_template('account.html')
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    # def start_authentication(self):
     def login(self, method='face'):
         client_id = str(uuid.uuid4())
 
@@ -105,19 +104,6 @@ class IdP(Asymmetric_IdP):
                                                        'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}"
                                                    }), 307)
 
-        """
-        raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/authenticate",
-                                                   params={
-                                                       'max_iterations': MAX_ITERATIONS_ALLOWED,
-                                                       'min_iterations': MIN_ITERATIONS_ALLOWED,
-                                                       'client': client_id,
-                                                       'key': base64.urlsafe_b64encode(aes_key),
-                                                       'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
-                                                       'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
-                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}"
-                                                   }), 307)
-        """
-
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def create_account(self, username, password):
@@ -125,7 +111,7 @@ class IdP(Asymmetric_IdP):
         if not creation_status:
             raise cherrypy.HTTPError(500, message='Error creating new account')
 
-        raise cherrypy.HTTPRedirect('/login')
+        raise cherrypy.HTTPRedirect('/login_locally')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
