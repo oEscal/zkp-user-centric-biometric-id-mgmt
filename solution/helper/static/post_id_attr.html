@@ -11,10 +11,10 @@
         you must press the Continue button once to proceed.
     </p>
 </noscript>
-<form action="${consumer_url}" method="post">
-    <input type="hidden" name="response" value="${response}"/>
-    <input type="hidden" name="signature" value="${signature}"/>
-    <input type="hidden" name="client" value="${client}"/>
+<form action="{{consumer_url}}" method="post">
+    <input type="hidden" name="response" value="{{response}}"/>
+    <input type="hidden" name="signature" value="{{signature}}"/>
+    <input type="hidden" name="client" value="{{client}}"/>
     <noscript>
         <input type="submit" value="Continue"/>
     </noscript>

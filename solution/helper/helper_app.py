@@ -4,7 +4,6 @@ import random
 
 import cherrypy
 import requests
-from mako.template import Template
 
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
@@ -407,10 +406,10 @@ class HelperApp(object):
         if 'deny' in kwargs:
             return self.jinja_env.get_template('auth_refused.html').render()
         elif 'allow' in kwargs:
-            return Template(filename='helper/static/post_id_attr.html').render(consumer_url=self.consumer_url,
-                                                                               response=self.response_attrs_b64,
-                                                                               signature=self.response_signature_b64,
-                                                                               client=self.sp_client)
+            return self.jinja_env.get_template('post_id_attr.html').render(consumer_url=self.consumer_url,
+                                                                           response=self.response_attrs_b64,
+                                                                           signature=self.response_signature_b64,
+                                                                           client=self.sp_client)
 
     @cherrypy.expose
     def zkp(self, password: str):
@@ -446,7 +445,7 @@ class HelperApp(object):
             raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
                                                        params={'error_id': 'idp_iterations'}), 301)
 
-        return Template(filename='helper/static/keychain.html').render(action='auth')
+        return self.jinja_env.get_template('keychain.html').render(action='auth')
 
     @cherrypy.expose
     def choose_iterations(self, **kwargs):
@@ -454,16 +453,16 @@ class HelperApp(object):
             raise cherrypy.HTTPError(401)
 
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/choose_iterations.html').render(idp=self.idp,
-                                                                                    max_iterations=self.max_idp_iterations,
-                                                                                    min_iterations=self.min_idp_iterations)
+            return self.jinja_env.get_template('choose_iterations.html').render(idp=self.idp,
+                                                                                max_iterations=self.max_idp_iterations,
+                                                                                min_iterations=self.min_idp_iterations)
         elif cherrypy.request.method == 'POST':
             if 'deny' in kwargs:
-                return Template(filename='helper/static/auth_refused.html').render()
+                return self.jinja_env.get_template('auth_refused.html').render()
             elif 'allow' in kwargs:
                 if ('iterations' not in kwargs or not kwargs['iterations']
                         or not kwargs['iterations'].isnumeric() or not int(kwargs['iterations'])):
-                    return Template(filename='helper/static/choose_iterations.html').render(
+                    return self.jinja_env.get_template('choose_iterations.html').render(
                         idp=self.idp,
                         max_iterations=self.max_idp_iterations,
                         min_iterations=self.min_idp_iterations,
@@ -479,23 +478,23 @@ class HelperApp(object):
                 #         message="Error: You must select a number of iterations belonging to the Identity Provider "
                 #                 "allowed interval, or deny the connection!")
 
-                return Template(filename='helper/static/keychain.html').render(action='auth')
+                return self.jinja_env.get_template('keychain.html').render(action='auth')
         else:
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
     def register(self, **kwargs):
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/register.html').render()
+            return self.jinja_env.get_template('register.html').render()
         elif cherrypy.request.method == 'POST':
             username = kwargs['username']
             master_password = kwargs['password'].encode()
 
             self.master_password_manager = Master_Password_Manager(username=username, master_password=master_password)
             if not self.master_password_manager.register_user():
-                return Template(filename='helper/static/register.html').render(
+                return self.jinja_env.get_template('register.html').render(
                     message='Error: The inserted user already exists!')
-            return Template(filename='helper/static/register.html').render(
+            return self.jinja_env.get_template('register.html').render(
                 message='Success: The user was registered with success')
         else:
             raise cherrypy.HTTPError(405)
