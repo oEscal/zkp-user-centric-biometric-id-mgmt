@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from idp.biometric_systems.facial.face import Faces
+from idp.biometric_systems.facial.face import Faces, get_features_from_face
 
 faceCascade = cv2.CascadeClassifier(f'{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml')
 
@@ -13,6 +13,15 @@ class Face_biometry:
 		self.username = username
 
 		self.faces = Faces(username=username)
+
+	def register_new_user(self):
+		for i in range(DEFAULT_NUMBER_FACES):
+			frame, face_locations = () # self.__take_shoot()
+			face_features = get_features_from_face(frame=frame, face_locations=face_locations)
+
+			self.faces.add(new_face_features=face_features)
+		self.faces.save_faces()
+		print("All facial features saved with success")
 
 	def verify_user(self, face_features: list[float], tolerance=0.4) -> bool:
 		all_verifications = self.faces.verify_user(np.array(face_features))
