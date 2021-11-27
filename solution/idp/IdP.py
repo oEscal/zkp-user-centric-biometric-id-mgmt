@@ -255,8 +255,6 @@ class IdP(Asymmetric_IdP):
                     'status': status,
                 })
         else:
-            print(current_zkp.iteration)
-            print(current_zkp.all_ok)
             raise cherrypy.HTTPError(401, message="ZKP protocol was not completed")
 
 

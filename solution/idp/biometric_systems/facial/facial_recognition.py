@@ -1,13 +1,8 @@
 from typing import Callable
 
-import cv2
 import numpy as np
 
-from idp.biometric_systems.facial.face import Faces, get_features_from_face
-
-faceCascade = cv2.CascadeClassifier(f'{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml')
-
-DEFAULT_NUMBER_FACES = 5
+from idp.biometric_systems.facial.face import Faces
 
 
 class Face_biometry:
@@ -26,6 +21,6 @@ class Face_biometry:
 
 	def verify_user(self, face_features: list[float], tolerance=0.4) -> bool:
 		all_verifications = self.faces.verify_user(np.array(face_features))
-		print(all_verifications)
+		print(f"Distance: {all_verifications}")
 
 		return all_verifications <= tolerance

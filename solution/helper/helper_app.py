@@ -14,7 +14,7 @@ from helper.managers import Master_Password_Manager, Password_Manager
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
-NUMBER_FACES_REGISTER = 1
+NUMBER_FACES_REGISTER = 7
 
 
 class HelperApp(object):

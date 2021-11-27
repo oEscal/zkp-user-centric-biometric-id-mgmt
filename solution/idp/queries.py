@@ -40,10 +40,10 @@ def save_faces(username: str, faces: bytes) -> bool:
         return False
 
 
-def get_faces(username):
+def get_faces(username) -> bytes:
     with sqlite3.connect(DB_NAME) as con:
-        r = con.execute("SELECT faces FROM user WHERE user=?", [username])
-        return r.fetchone()
+        r = con.execute("SELECT faces FROM user WHERE username=?", [username])
+        return r.fetchone()[0]
 
 
 def setup_database():
