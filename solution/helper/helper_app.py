@@ -610,7 +610,8 @@ class HelperApp(object):
             if response.status_code != 200:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
-                self.zkp_auth()
+                # self.zkp_auth()
+                return "The IdP was no able to login with face"
             else:
                 response_dict = self.cipher_auth.decipher_response(response.json())
                 self.response_attrs_b64 = response_dict['response']
