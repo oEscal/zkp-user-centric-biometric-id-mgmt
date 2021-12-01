@@ -588,7 +588,7 @@ class HelperApp(object):
 
         if operation == 'verify':
             if 'username' not in kwargs:
-                return self.jinja_env.get_template('biometric_face.html').render(
+                return self.jinja_env.get_template('biometric_auth.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must indicate the username you want to login with on this IdP!")
 
