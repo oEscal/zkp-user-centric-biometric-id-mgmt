@@ -1,25 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Biometric Authentication</title>
-</head>
-<body>
-<form action="/biometric_${method}" method="get">
-      <h3>Your user for the Identity Provider '<a href="${idp}">${idp}</a>': </h3>
-        <input hidden="text" id="operation" name="operation" value="${operation}" />
+{% extends "base.html" %}
+{% block content %}
+{% if message %}
+<div class="modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><b>Message</b></h5>
+            </div>
+            <div class="modal-body">
+                <p>{{message}}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="close_modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('.modal').modal('show');
+    $('#close_modal').on('click', () => {
+        $('.modal').modal('hide');
+    })
+</script>
+{% endif %}
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <form action="/biometric_{{method}}" method="get">
+            <div class="row mb-4 px-3">
+                <h3 class="mb-0 mr-4 mt-2">Your user for the Identity Provider '<a href="{{idp}}">{{idp}}</a>': </h3>
+            </div>
+            <input hidden="text" id="operation" name="operation" value="{{operation}}"/>
 
-        <label for="username">Username: </label>
-        <input type="username" id="username" name="username" />
-
-      <input type="submit" value="Login using biometrics" />
-
-        % if context.get('message', UNDEFINED) is not UNDEFINED:
-        <br>
-        <br>
-        <br>
-        <h4>${message}</h4>
-      % endif
-    </form>
-</body>
-</html>
+            <label for="username">Username: </label>
+            <input type="username" id="username" name="username" required placeholder="username"/>
+            <div class="row px-3 mb-4">
+                <input type="submit" value="Login using biometrics" class="btn btn-blue btn-block text-center"/>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -49,7 +49,7 @@ class HelperApp(object):
         self.response_signature_b64 = ''
 
         self.jinja_env = Environment(loader=FileSystemLoader('helper/static'))
-        self.face_biometry: Face_biometry = None    # = Face_biometry('escaleira')
+        self.face_biometry: Face_biometry = None  # = Face_biometry('escaleira')
         self.register_biometric = False
         self.registration_method = ''
 
@@ -454,8 +454,8 @@ class HelperApp(object):
         self.reg_bio = reg_bio
 
         if method == 'face':
-            return Template(filename='helper/static/biometric_auth.html').render(idp=self.idp, method=method,
-                                                                                 operation='verify')
+            return self.jinja_env.get_template('biometric_auth.html').render(idp=self.idp, method=method,
+                                                                             operation='verify')
         else:
             self.max_idp_iterations = int(max_iterations)
 
@@ -471,14 +471,14 @@ class HelperApp(object):
 
             # verify if the user is authenticated
             if not self.master_password_manager:
-                return Template(filename='helper/static/keychain.html').render(action='auth')
+                return self.jinja_env.get_template('keychain.html').render(action='auth')
 
             if self.register_biometric:
                 self.zkp_auth()
                 # raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
                 #                                            params={'username': '', 'operation': 'register'}), 301)
 
-            return Template(filename='helper/static/select_idp_user.html').render(
+            return self.jinja_env.get_template('select_idp_user.html').render(
                 idp=self.idp,
                 users=self.master_password_manager.get_users_for_idp(self.idp))
 
@@ -538,18 +538,18 @@ class HelperApp(object):
     def biometric_register(self, **kwargs):
         # verify if the user is authenticated
         if not self.master_password_manager:
-            return Template(filename='helper/static/keychain.html').render(action='biometric_register')
+            return self.jinja_env.get_template('keychain.html').render(action='biometric_register')
 
         if cherrypy.request.method == 'GET':
-            return Template(filename='helper/static/biometric_register.html').render(
+            return self.jinja_env.get_template('biometric_register.html').render(
                 idps=self.master_password_manager.idps)
         elif cherrypy.request.method == 'POST':
             if 'idp_user' not in kwargs:
-                return Template(filename='helper/static/biometric_register.html').render(
+                return self.jinja_env.get_template('biometric_register.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must select a user to update!")
             elif 'method' not in kwargs:
-                return Template(filename='helper/static/biometric_register.html').render(
+                return self.jinja_env.get_template('biometric_register.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must select the biometric method you want to register with!")
 
@@ -588,7 +588,7 @@ class HelperApp(object):
 
         if operation == 'verify':
             if 'username' not in kwargs:
-                return Template(filename='helper/static/biometric_face.html').render(
+                return self.jinja_env.get_template('biometric_face.html').render(
                     idps=self.master_password_manager.idps,
                     message="Error: You must indicate the username you want to login with on this IdP!")
 
