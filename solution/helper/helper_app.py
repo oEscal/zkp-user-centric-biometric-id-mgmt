@@ -85,7 +85,8 @@ class HelperApp(object):
             'zkp_inf_cycle': "The ZKP was already executed one time previously, which means that there was some error "
                              "on the identification process!",
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
-                                 "this is the IdP we are contacting is not a trusted one!"
+                                 "this is the IdP we are contacting is not a trusted one!",
+            'face_register_error': "There was an error registering this user's face on the selected IdP."
         }
         return Template(filename='helper/static/error.html').render(message=errors[error_id])
 
@@ -633,7 +634,10 @@ class HelperApp(object):
 
             if response.status_code != 200:
                 # TODO ->  ANALISAR MENSAGEM DE ERRO
-                return 'False'
+                print(f"Error received from idp on function <{self.biometric_face.__name__}>: "
+                      f"<{response.status_code}: {response.reason}>")
+                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                                                           params={'error_id': 'face_register_error'}), 301)
             else:
                 return 'Success'
 
