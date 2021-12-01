@@ -14,6 +14,8 @@ from jinja2 import Environment, FileSystemLoader
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
+NUMBER_FACES_REGISTER = 7
+
 
 class HelperApp(object):
     def __init__(self):
@@ -30,6 +32,7 @@ class HelperApp(object):
         self.save_pk_url = ''
         self.id_url = ''
         self.auth_bio = ''
+        self.reg_bio = ''
 
         self.idp_client = ''
         self.sp_client = ''
@@ -83,7 +86,8 @@ class HelperApp(object):
             'zkp_inf_cycle': "The ZKP was already executed one time previously, which means that there was some error "
                              "on the identification process!",
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
-                                 "this is the IdP we are contacting is not a trusted one!"
+                                 "this is the IdP we are contacting is not a trusted one!",
+            'face_register_error': "There was an error registering this user's face on the selected IdP."
         }
         return self.jinja_env.get_template('error.html').render(message=errors[error_id])
 
@@ -432,7 +436,8 @@ class HelperApp(object):
         self.zkp_auth()
 
     @cherrypy.expose
-    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url, auth_bio):
+    def authenticate(self, max_iterations, min_iterations, client, key, method, auth_url, save_pk_url, id_url, auth_bio,
+                     reg_bio):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
@@ -445,6 +450,7 @@ class HelperApp(object):
         self.save_pk_url = save_pk_url
         self.id_url = id_url
         self.auth_bio = auth_bio
+        self.reg_bio = reg_bio
 
         if method == 'face':
             return Template(filename='helper/static/biometric_auth.html').render(idp=self.idp, method=method,
@@ -561,6 +567,11 @@ class HelperApp(object):
             self.password_manager = Password_Manager(master_username=master_username, master_password=master_password,
                                                      idp_user=selected_user, idp=self.idp)
 
+            # load password
+            if not self.password_manager.load_password():
+                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                                                           params={'error_id': 'load_pass_error'}), 301)
+
             self.registration_method = kwargs['method']
 
             raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={'method': 'zkp'}), status=303)
@@ -568,20 +579,25 @@ class HelperApp(object):
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
-    def biometric_face(self, username, operation):
-        if cherrypy.request.method != 'POST':
+    def biometric_face(self, operation, **kwargs):
+        if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
         self.face_biometry = Face_biometry()
 
         if operation == 'verify':
+            if 'username' not in kwargs:
+                return Template(filename='helper/static/biometric_face.html').render(
+                    idps=self.master_password_manager.idps,
+                    message="Error: You must indicate the username you want to login with on this IdP!")
+
             features = self.face_biometry.get_facial_features()
 
             id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
 
             ciphered_params = self.cipher_auth.create_response({
                 'id_attrs': id_attrs_b64.decode(),
-                'username': username,
+                'username': kwargs['username'],
                 'features': features
             })
 
@@ -589,8 +605,6 @@ class HelperApp(object):
                 'client': self.idp_client,
                 **ciphered_params
             })
-
-            print(f"\n\n\n{response.status_code}\n\n\n")
 
             if response.status_code != 200:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
@@ -604,15 +618,35 @@ class HelperApp(object):
             raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
         elif operation == 'register':
             self.register_biometric = False
-            features = self.face_biometry.get_facial_features()
-            print(features)
-            return 'ola'
+
+            features = []
+            for i in range(NUMBER_FACES_REGISTER):
+                features.append(self.face_biometry.get_facial_features())
+
+            ciphered_params = self.cipher_auth.create_response({
+                'features': features
+            })
+
+            print(self.reg_bio)
+            response = requests.get(self.reg_bio, params={
+                'client': self.idp_client,
+                'method': 'face',
+                **ciphered_params
+            })
+
+            if response.status_code != 200:
+                # TODO ->  ANALISAR MENSAGEM DE ERRO
+                print(f"Error received from idp on function <{self.biometric_face.__name__}>: "
+                      f"<{response.status_code}: {response.reason}>")
+                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                                                           params={'error_id': 'face_register_error'}), 301)
+            else:
+                return 'Success'
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
             raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
-                                                       params={'username': '', 'operation': 'register'}), 301)
-
+                                                       params={'operation': 'register'}), 301)
 
 
 if __name__ == '__main__':
