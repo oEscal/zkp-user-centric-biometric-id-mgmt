@@ -26,10 +26,10 @@ def get_user(field_content: str, field_name='username', as_dict=False) -> tuple 
 
 
 def save_user(username: str, password: str):
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    # hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     try:
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("INSERT INTO user(username, password) values(?, ?)", (username, hashed))
+            con.execute("INSERT INTO user(username, password) values(?, ?)", (username, password))
             con.commit()
 
             return True
@@ -41,8 +41,8 @@ def save_user(username: str, password: str):
 def update_user(user_id, new_args):
     try:
         with sqlite3.connect(DB_NAME) as con:
-            if 'password' in new_args:
-                new_args['password'] = bcrypt.hashpw(new_args['password'].encode(), bcrypt.gensalt())
+            # if 'password' in new_args:
+            #     new_args['password'] = bcrypt.hashpw(new_args['password'].encode(), bcrypt.gensalt())
 
             query = ", ".join([f'{field_name}=?' for field_name in new_args])
             values = list(new_args.values())
@@ -86,11 +86,11 @@ def get_user_key(id: str, username: str) -> tuple[bytes]:
 
 
 def check_credentials(username, password):
-    saved_hashed_password = get_user(username, as_dict=True).get('password')
-    if saved_hashed_password is None:
+    saved_password = get_user(username, as_dict=True).get('password')
+    if saved_password is None:
         return False
 
-    return bcrypt.checkpw(password.encode(), saved_hashed_password)
+    return saved_password == password # bcrypt.checkpw(password.encode(), saved_hashed_password)
 
 
 def save_faces(username: str, faces: bytes) -> bool:
@@ -116,7 +116,7 @@ def setup_database():
         con.execute("CREATE TABLE if not exists user ("
                     "id integer primary key,"
                     "username text not null unique,"
-                    "password blob null",
+                    "password blob null,"
                     "faces blob,"
                     "fingerprints blob"
                     ")")
@@ -125,5 +125,5 @@ def setup_database():
                     "user text not null,"
                     "value text not null,"
                     "not_valid_after real not null,"
-                    "foreign key(user) references user(username) on update cascade on delete cascade"
+                    "foreign key(user) references user(id) on update cascade on delete cascade"
                     ")")

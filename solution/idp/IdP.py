@@ -85,7 +85,7 @@ class IdP(Asymmetric_IdP):
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    def login(self, method='face'):
+    def login(self, method='zkp'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)

@@ -4,6 +4,7 @@ import random
 
 import cherrypy
 import requests
+from mako.template import Template
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
 from utils.utils import ZKP, overlap_intervals, \
