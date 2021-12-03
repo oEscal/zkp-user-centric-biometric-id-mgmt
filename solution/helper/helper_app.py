@@ -645,13 +645,53 @@ class HelperApp(object):
             else:
                 return 'Success'
 
+    @cherrypy.expose
+    def fingerprint(self, operation='apagar', **kwargs):
+        with open('helper/static/fingerprint.html') as f:
+            index_page = f.read()
+        return index_page % {'username': "User%d" % random.randint(50, 1000),
+                             'ws_addr': 'ws://192.168.1.182:1080/ws'}
+        # return self.jinja_env.get_template('fingerprint.html').render()
+        # if cherrypy.request.method != 'GET':
+        #     raise cherrypy.HTTPError(405)
+
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
             raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
                                                        params={'operation': 'register'}), 301)
 
+        elif self.registration_method == 'fingerprint':
+            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/fingerprint",
+                                                       params={'operation': 'register'}), 301)
+
+    @cherrypy.expose
+    def ws(self):
+        pass
+
+
+from ws4py.websocket import WebSocket
+from ws4py.messaging import TextMessage
+from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+
+
+class ChatWebSocketHandler(WebSocket):
+    def received_message(self, m):
+        cherrypy.engine.publish('websocket-broadcast', m)
+
+    def closed(self, code, reason="A client left the room without a proper explanation."):
+        cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
+
 
 if __name__ == '__main__':
-    cherrypy.config.update({'server.socket_host': '127.1.2.3',
+    cherrypy.config.update({'server.socket_host': '0.0.0.0',
                             'server.socket_port': 1080})
-    cherrypy.quickstart(HelperApp())
+
+    WebSocketPlugin(cherrypy.engine).subscribe()
+    cherrypy.tools.websocket = WebSocketTool()
+
+    cherrypy.quickstart(HelperApp(), '', config={
+        '/ws': {
+            'tools.websocket.on': True,
+            'tools.websocket.handler_cls': ChatWebSocketHandler
+        }
+    })
