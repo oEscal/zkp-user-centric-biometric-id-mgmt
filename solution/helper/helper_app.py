@@ -4,13 +4,15 @@ import random
 
 import cherrypy
 import requests
-from mako.template import Template
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
 from jinja2 import Environment, FileSystemLoader
+
+import numpy as np
+
 
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
@@ -623,7 +625,10 @@ class HelperApp(object):
 
             features = []
             for i in range(NUMBER_FACES_REGISTER):
-                features.append(self.face_biometry.get_facial_features())
+                current_features = self.face_biometry.get_facial_features()
+                if features:
+                    print(np.linalg.norm(np.asarray(current_features)-np.asarray(features[-1])))
+                features.append(current_features)
 
             ciphered_params = self.cipher_auth.create_response({
                 'features': features
