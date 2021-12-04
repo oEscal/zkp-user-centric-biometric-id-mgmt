@@ -1,10 +1,7 @@
 import cv2
 import face_recognition
 import numpy as np
-
-faceCascade = cv2.CascadeClassifier(f'{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml')
-
-DEFAULT_NUMBER_FACES = 5
+import threading
 
 
 def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> list[float]:
@@ -12,56 +9,70 @@ def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> lis
 
 
 class Face_biometry:
-	def __init__(self):
-		pass
+	def __init__(self, number_faces, min_distance=0.25):
+		self.number_faces = number_faces
+		self.min_distance = min_distance
 
-	@staticmethod
-	def __take_shoot() -> (np.ndarray, list[list]):
+		self.frame = None
+		self.__stop_camera = False
+
+	def __camera(self):
 		video_capture = cv2.VideoCapture(0)
-		take_shot = False
+		# take_shot = False
 
 		while True:
 			# Capture frame-by-frame
-			ret, frame = video_capture.read()
+			_, self.frame = video_capture.read()
 
-			"""
-			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			# if cv2.waitKey(1) & 0xFF == ord('s'):
+			# 	take_shot = True
 
-			faces = faceCascade.detectMultiScale(
-				gray,
-				scaleFactor=1.5,
-				minNeighbors=5,
-				# minSize=(60, 60),
-				# flags=cv2.CASCADE_SCALE_IMAGE
-			)
-			"""
+			cv2.waitKey(1)
 
-			if cv2.waitKey(1) & 0xFF == ord('s'):
-				take_shot = True
-
-			# Draw a rectangle around the faces
-			if take_shot:
-				for face in face_recognition.face_locations(frame):
-					video_capture.release()
-					cv2.destroyAllWindows()
-					return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), [face]
-
-			# for (x, y, w, h) in faces:
-			#     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-			# Display the resulting frame
-			cv2.imshow('Video', frame)
-
-			"""
-			if cv2.waitKey(1) & 0xFF == ord('s'):
-				ret, frame = video_capture.read()
-
+			if self.__stop_camera:
 				video_capture.release()
 				cv2.destroyAllWindows()
+				return
 
-				return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-			"""
+			cv2.imshow('Video', self.frame)
 
-	def get_facial_features(self) -> list[float]:
-		frame, face_locations = self.__take_shoot()
-		return get_features_from_face(frame=frame, face_locations=face_locations)
+	def __get_face_features(self, final_face_features):
+		while True:
+			if self.frame is not None:
+				for face in face_recognition.face_locations(self.frame):
+					print(face)
+					current_features = get_features_from_face(frame=cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB),
+					                                          face_locations=[face])
+					if final_face_features:
+						print(type(np.linalg.norm(np.asarray(current_features) - np.asarray(final_face_features[-1]))))
+						print(np.linalg.norm(np.asarray(current_features) - np.asarray(final_face_features[-1])))
+					if (not final_face_features or
+							np.linalg.norm(np.asarray(current_features) - np.asarray(final_face_features[-1])) > self.min_distance):
+						final_face_features.append(current_features)
+						print("NEW FACE ADDED")
+
+				if len(final_face_features) == self.number_faces:
+					self.__stop_camera = True
+					return final_face_features
+
+	def get_facial_features(self) -> list[list[float]]:
+		final_face_features = []
+		threads = [threading.Thread(target=self.__camera),
+		           threading.Thread(target=self.__get_face_features, args=(final_face_features, ))]
+
+		# start threads
+		for t in threads:
+			t.start()
+			print("Thread started")
+
+		print("All threads started")
+
+		# self.__take_shoot()
+
+		# join threads
+		for t in threads:
+			t.join()
+			print("Thread joined")
+
+		return final_face_features
+

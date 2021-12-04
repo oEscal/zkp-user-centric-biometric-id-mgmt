@@ -586,7 +586,7 @@ class HelperApp(object):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
-        self.face_biometry = Face_biometry()
+        self.face_biometry = Face_biometry(number_faces=NUMBER_FACES_REGISTER)
 
         if operation == 'verify':
             if 'username' not in kwargs:
@@ -623,12 +623,15 @@ class HelperApp(object):
         elif operation == 'register':
             self.register_biometric = False
 
-            features = []
-            for i in range(NUMBER_FACES_REGISTER):
-                current_features = self.face_biometry.get_facial_features()
-                if features:
-                    print(np.linalg.norm(np.asarray(current_features)-np.asarray(features[-1])))
-                features.append(current_features)
+            features = self.face_biometry.get_facial_features()
+            # for i in range(NUMBER_FACES_REGISTER):
+            #     current_features = self.face_biometry.get_facial_features()
+            #     if features:
+            #         print(np.linalg.norm(np.asarray(current_features)-np.asarray(features[-1])))
+            #     features.append(current_features)
+
+            print(features)
+            exit(1)
 
             ciphered_params = self.cipher_auth.create_response({
                 'features': features
