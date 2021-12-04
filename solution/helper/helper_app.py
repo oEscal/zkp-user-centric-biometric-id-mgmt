@@ -4,9 +4,10 @@ import random
 
 import cherrypy
 import requests
-from mako.template import Template
+from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
+from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
@@ -50,6 +51,7 @@ class HelperApp(object):
 
         self.jinja_env = Environment(loader=FileSystemLoader('helper/static'))
         self.face_biometry: Face_biometry = None  # = Face_biometry('escaleira')
+        self.fingerprint: Fingerprint = None
         self.register_biometric = False
         self.registration_method = ''
 
@@ -645,15 +647,46 @@ class HelperApp(object):
             else:
                 return 'Success'
 
+    def ws_publish(self, message, channel="websocket-broadcast"):
+        cherrypy.engine.publish(channel, message)
+
     @cherrypy.expose
-    def fingerprint(self, operation='apagar', **kwargs):
-        with open('helper/static/fingerprint.html') as f:
-            index_page = f.read()
-        return index_page % {'username': "User%d" % random.randint(50, 1000),
-                             'ws_addr': 'ws://192.168.1.182:1080/ws'}
-        # return self.jinja_env.get_template('fingerprint.html').render()
-        # if cherrypy.request.method != 'GET':
-        #     raise cherrypy.HTTPError(405)
+    @cherrypy.tools.json_out()
+    def biometric_fingerprint_api(self, operation, **kwargs):
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        self.fingerprint = Fingerprint()
+        setup_status = self.fingerprint.setup()
+
+        if not setup_status.get('is_ready'):
+            cherrypy.response.status = 500
+            return {'message': setup_status.get('message')}
+
+        if operation == 'verify':
+            pass
+
+        elif operation == 'register':
+            for flow in self.fingerprint.enroll_finger():
+                status = flow.get('status')
+                message = flow.get('message')
+                if status:
+                    self.ws_publish(message)
+                else:
+                    cherrypy.response.status = 500
+                    return {'message': message}
+
+    @cherrypy.expose
+    def biometric_fingerprint(self, operation):
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        if operation == 'verify':
+            pass
+
+        elif operation == 'register':
+            return self.jinja_env.get_template('fingerprint.html').render(
+                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation)
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
@@ -661,37 +694,28 @@ class HelperApp(object):
                                                        params={'operation': 'register'}), 301)
 
         elif self.registration_method == 'fingerprint':
-            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/fingerprint",
+            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_fingerprint",
                                                        params={'operation': 'register'}), 301)
 
     @cherrypy.expose
-    def ws(self):
+    def fingerprint_instructions_ws(self):
         pass
 
-
-from ws4py.websocket import WebSocket
-from ws4py.messaging import TextMessage
-from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
-
-
-class ChatWebSocketHandler(WebSocket):
-    def received_message(self, m):
-        cherrypy.engine.publish('websocket-broadcast', m)
-
-    def closed(self, code, reason="A client left the room without a proper explanation."):
-        cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
+    # @cherrypy.expose
+    # def feed(self, m):
+    #     for i in range(1000):
+    #         cherrypy.engine.publish("websocket-broadcast", m)
 
 
 if __name__ == '__main__':
-    cherrypy.config.update({'server.socket_host': '0.0.0.0',
+    cherrypy.config.update({'server.socket_host': '127.1.2.3',
                             'server.socket_port': 1080})
 
     WebSocketPlugin(cherrypy.engine).subscribe()
     cherrypy.tools.websocket = WebSocketTool()
 
     cherrypy.quickstart(HelperApp(), '', config={
-        '/ws': {
-            'tools.websocket.on': True,
-            'tools.websocket.handler_cls': ChatWebSocketHandler
+        '/fingerprint_instructions_ws': {
+            'tools.websocket.on': True
         }
     })
