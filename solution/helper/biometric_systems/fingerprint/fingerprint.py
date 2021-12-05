@@ -3,14 +3,16 @@ import serial
 import time
 
 FINGERPRINT_ERRORS = {
-    'NOT_READY': "Error in sensor's initialization; Refresh the page to try again"
+    'NOT_READY': "Error in sensor's initialization; Refresh the page to try again",
+    'REGISTER_ERROR': "There was an error registering this user's fingerprint on the selected IdP.",
+    'LOGIN_ERROR': "The IdP was no able to login with fingerprint"
 }
 
 FINGER_IMAGE_ACQUISITION = 0
 TEMPLATE_CREATION = 1
 FINGER_REMOVAL = 2
 MODEL_CREATION = 3
-MODEL_STORAGE = 4
+MODEL_DATA = 4
 ERROR = 5
 
 
@@ -29,12 +31,15 @@ class Fingerprint:
             print(e)
             return {'is_ready': False, 'message': FINGERPRINT_ERRORS['NOT_READY']}
 
-    def create_yield_object(self, message, phase, status=True):
-        return {'message': message, 'phase': phase, 'status': status}
+    def create_yield_object(self, message, phase, status=True, data=None):
+        return {'message': message, 'phase': phase, 'status': status, 'data': data}
 
-    def enroll_finger(self):
+    def get_fingerprint(self, operation):
+        n = self.n_img
+        if operation == 'verify':
+            n = 2
         try:
-            for finger_img in range(1, self.n_img + 1):
+            for finger_img in range(1, n + 1):
                 # get fingerprint image
                 yield self.create_yield_object("\nPlace finger on sensor...", FINGER_IMAGE_ACQUISITION)
 
@@ -89,6 +94,7 @@ class Fingerprint:
             # Model generation
             yield self.create_yield_object("\nCreating model...", MODEL_CREATION)
             model = self.finger.create_model()
+
             if model == adafruit_fingerprint.OK:
                 yield self.create_yield_object("Model created\n", MODEL_CREATION)
 
@@ -98,13 +104,10 @@ class Fingerprint:
 
             else:
                 yield self.create_yield_object("Other error\n", MODEL_CREATION, False)
+                return
 
-            # Model storage
-            model_data = self.finger.get_fpdata("char", 1)
-            with open('finger_models/fingerprint.raw', 'wb') as fp:
-                fp.write(bytearray(model_data))
-
-            yield self.create_yield_object("Fingerprint model saved", MODEL_STORAGE)
+            data = {'model_data': self.finger.get_fpdata("char", 1)}
+            yield self.create_yield_object("", MODEL_DATA, data=data)
 
         except Exception as e:
             yield self.create_yield_object(f'{e}\n', ERROR, False)

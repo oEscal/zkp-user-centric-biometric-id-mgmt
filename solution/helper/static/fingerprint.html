@@ -16,6 +16,11 @@
         </div>
     </div>
 </div>
+<script>
+    $('#close_modal').on('click', () => {
+        $('.modal').modal('hide');
+    })
+</script>
 <div class="col-lg-12">
     <div class="card2 card border-0 px-4 py-5">
         <div class="row mb-4 px-3">
@@ -29,19 +34,27 @@
             <textarea class="form-control" rows="10" id="instructions" readonly="readonly"></textarea>
         </div>
     </div>
+
 </div>
 
 <script type="application/javascript">
     $(document).ready(function () {
         $("#instructions").val("");
-
+        let url = '/biometric_fingerprint_api?operation={{operation}}';
+        {% if username %}
+            url = '/biometric_fingerprint_api?operation={{operation}}&username={{username}}';
+        {% endif %}
         $.ajax({
-            'url': '/biometric_fingerprint_api?operation={{operation}}',
+            'url': url,
             type: 'GET',
             success: (e) => {
 
             },
             error: (e) => {
+                if (e.status === 302) {
+                    window.location.replace(e.responseJSON.url);
+                    return;
+                }
                 $("#modal_message").text(e.responseJSON.message);
                 $('.modal').modal('show');
             }

@@ -10,8 +10,9 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 from idp.biometric_systems.facial.facial_recognition import Face_biometry
+from idp.biometric_systems.fingerprint.fingerprint import Fingerprint
 from idp.queries import setup_database, get_user, save_user_key, get_user_key, save_user, check_credentials, \
-    update_user, delete_user, save_faces, get_faces
+    update_user, delete_user, save_faces, get_faces, save_fingerprint, get_fingerprint
 from utils.utils import ZKP_IdP, asymmetric_padding_signature, asymmetric_hash, create_get_url, \
     Cipher_Authentication, \
     asymmetric_upload_derivation_key, asymmetric_padding_encryption
@@ -85,7 +86,7 @@ class IdP(Asymmetric_IdP):
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    def login(self, method='face'):
+    def login(self, method='fingerprint'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
@@ -316,6 +317,22 @@ class IdP(Asymmetric_IdP):
                 })
             else:
                 raise cherrypy.HTTPError(401, message="Authentication failed")
+
+        elif method == 'fingerprint':
+            fingerprint = Fingerprint(username  , get_fingerprint_func=get_fingerprint)
+
+            setup_status = fingerprint.setup()
+            if not setup_status.get('is_ready'):
+                raise cherrypy.HTTPError(401, message=setup_status.get('message'))
+
+            if fingerprint.verify_user(request_args.get("model_data")):
+                return current_zkp.create_response({
+                    'response': response_b64.decode(),
+                    'signature': response_signature_b64.decode()
+                })
+            else:
+                raise cherrypy.HTTPError(401, message="Authentication failed")
+
         else:
             raise cherrypy.HTTPError(403, message="Authentication method does not correspond with this endpoint")
 
@@ -333,6 +350,14 @@ class IdP(Asymmetric_IdP):
                                               get_faces_funct=get_faces)
 
                 status = face_biometry.register_new_user(faces_features=request_args['features'])
+
+                return current_zkp.create_response({
+                    'status': status,
+                })
+
+            elif method == 'fingerprint':
+                fingerprint = Fingerprint(current_zkp.username, save_fingerprint_func=save_fingerprint)
+                status = fingerprint.register_new_user(request_args.get('model_data'))
 
                 return current_zkp.create_response({
                     'status': status,
