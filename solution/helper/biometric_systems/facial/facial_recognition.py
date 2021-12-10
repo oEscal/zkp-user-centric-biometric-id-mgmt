@@ -9,7 +9,7 @@ def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> lis
 
 
 class Face_biometry:
-    def __init__(self, min_distance=0.3):
+    def __init__(self, min_distance=0.4):
         self.min_distance = min_distance
 
         self.frame = None
@@ -36,6 +36,7 @@ class Face_biometry:
             cv2.imshow('Video', self.frame)
 
     def __get_face_features(self, final_face_features, number_faces):
+        n = 0
         while True:
             if self.frame is not None:
                 faces = face_recognition.face_locations(self.frame)
@@ -51,6 +52,8 @@ class Face_biometry:
                             add_face = False
                             break
                     if add_face:
+                        cv2.imwrite(f'frame{n}.jpg', self.frame)
+                        n += 1
                         print("Face Added")
                         final_face_features.append(current_features)
 
