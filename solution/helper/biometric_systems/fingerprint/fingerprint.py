@@ -1,6 +1,8 @@
 import adafruit_fingerprint
 import serial
 import time
+import io
+from PIL import Image
 
 FINGERPRINT_ERRORS = {
     'NOT_READY': "Error in sensor's initialization; Refresh the page to try again",
@@ -17,7 +19,7 @@ ERROR = 5
 
 
 class Fingerprint:
-    def __init__(self, n_img=3):
+    def __init__(self, n_img=10):
         self.n_img = n_img
         self.uart = None
         self.finger = None
@@ -36,8 +38,6 @@ class Fingerprint:
 
     def get_fingerprint(self, operation):
         n = self.n_img
-        if operation == 'verify':
-            n = 2
         try:
             for finger_img in range(1, n + 1):
                 # get fingerprint image
@@ -61,54 +61,38 @@ class Fingerprint:
                         yield self.create_yield_object("Other error\n", FINGER_IMAGE_ACQUISITION, False)
                         return
 
-                # Generate fingerprint template
-                yield self.create_yield_object("Templating...", TEMPLATE_CREATION)
-                template = self.finger.image_2_tz(finger_img)
-
-                if template == adafruit_fingerprint.OK:
-                    yield self.create_yield_object("Templated\n", TEMPLATE_CREATION)
-
-                elif template == adafruit_fingerprint.IMAGEMESS:
-                    yield self.create_yield_object("Image too messy\n", TEMPLATE_CREATION, False)
-                    return
-
-                elif template == adafruit_fingerprint.FEATUREFAIL:
-                    yield self.create_yield_object("Could not identify features\n", TEMPLATE_CREATION, False)
-                    return
-
-                elif template == adafruit_fingerprint.INVALIDIMAGE:
-                    yield self.create_yield_object("Image invalid\n", TEMPLATE_CREATION, False)
-                    return
-
-                else:
-                    yield self.create_yield_object("Other error\n", TEMPLATE_CREATION, False)
-                    return
-
-                yield self.create_yield_object("Remove finger...", FINGER_REMOVAL)
-                time.sleep(1)
-                removal_status = None
-                while removal_status != adafruit_fingerprint.NOFINGER:
-                    removal_status = self.finger.get_image()
-                    yield self.create_yield_object(".", FINGER_REMOVAL)
-
-            # Model generation
-            yield self.create_yield_object("\nCreating model...", MODEL_CREATION)
-            model = self.finger.create_model()
-
-            if model == adafruit_fingerprint.OK:
-                yield self.create_yield_object("Model created\n", MODEL_CREATION)
-
-            elif model == adafruit_fingerprint.ENROLLMISMATCH:
-                yield self.create_yield_object("Prints did not match\n", MODEL_CREATION, False)
-                return
-
-            else:
-                yield self.create_yield_object("Other error\n", MODEL_CREATION, False)
-                return
-
-            data = {'model_data': self.finger.get_fpdata("char", 1)}
+            msg = "\nCreating fingerprint model...\n"
+            if operation == 'verify':
+                msg = "\nChecking fingerprint model...\n"
+            yield self.create_yield_object(msg, MODEL_CREATION)
+            data = {'model_data': self.finger.get_fpdata("image")}
             yield self.create_yield_object("", MODEL_DATA, data=data)
 
         except Exception as e:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
+
+    def convert_model_data_to_image(self, model_data):
+        try:
+            img = Image.new("L", (256, 288), "white")
+            pixel_data = img.load()
+            mask = 0b00001111
+
+            x, y = 0, 0
+            for i in range(len(model_data)):
+                pixel_data[x, y] = (int(model_data[i]) >> 4) * 17
+                x += 1
+                pixel_data[x, y] = (int(model_data[i]) & mask) * 17
+                if x == 255:
+                    x = 0
+                    y += 1
+                else:
+                    x += 1
+
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            return buf.getvalue()
+
+        except Exception as e:
+            print(f'Error {e}')
+            return None

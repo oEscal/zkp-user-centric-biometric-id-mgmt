@@ -647,8 +647,12 @@ class HelperApp(object):
             else:
                 return 'Success'
 
-    def ws_publish(self, message, channel="websocket-broadcast"):
-        cherrypy.engine.publish(channel, message)
+    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
+        data = {
+            'content': message,
+            'operation': operation
+        }
+        cherrypy.engine.publish(channel, json.dumps(data))
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -678,6 +682,9 @@ class HelperApp(object):
 
             if phase == MODEL_DATA:
                 model_data = flow.get('data', {}).get('model_data')
+                self.ws_publish("Generating fingerprint's image\n")
+                fingerprint_image = self.fingerprint.convert_model_data_to_image(model_data)
+                self.ws_publish(base64.b64encode(fingerprint_image).decode(), operation="fingerprint_image")
 
                 if operation == 'verify':
                     id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
@@ -685,7 +692,7 @@ class HelperApp(object):
                     ciphered_params = self.cipher_auth.create_response({
                         'id_attrs': id_attrs_b64.decode(),
                         'username': kwargs['username'],
-                        'model_data': model_data
+                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
                     })
 
                     response = requests.get(self.auth_bio, params={
@@ -706,9 +713,9 @@ class HelperApp(object):
 
                 elif operation == 'register':
                     self.register_biometric = False
-
+                    
                     ciphered_params = self.cipher_auth.create_response({
-                        'model_data': model_data
+                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
                     })
 
                     response = requests.post(self.reg_bio, data={
@@ -732,11 +739,12 @@ class HelperApp(object):
         if operation == 'verify':
             return self.jinja_env.get_template('fingerprint.html').render(
                 ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
-                username=kwargs.get('username'))
+                username=kwargs.get('username'), operation_message="Fingerprint Verification")
 
         elif operation == 'register':
             return self.jinja_env.get_template('fingerprint.html').render(
-                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation)
+                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
+                operation_message="Fingerprint Registration")
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':

@@ -40,3 +40,6 @@ Jinja2==3.0.1
 bcrypt==3.2.0
 adafruit-circuitpython-fingerprint==2.2.1
 ws4py==0.5.1
+fingerprint-enhancer==0.0.12
+Pillow==8.4.0
+scikit-image==0.19.0

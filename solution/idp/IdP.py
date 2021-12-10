@@ -319,20 +319,15 @@ class IdP(Asymmetric_IdP):
                 raise cherrypy.HTTPError(401, message="Authentication failed")
 
         elif method == 'fingerprint':
-            fingerprint = Fingerprint(username  , get_fingerprint_func=get_fingerprint)
+            fingerprint = Fingerprint(username, get_fingerprint_func=get_fingerprint)
 
-            setup_status = fingerprint.setup()
-            if not setup_status.get('is_ready'):
-                raise cherrypy.HTTPError(401, message=setup_status.get('message'))
-
-            if fingerprint.verify_user(request_args.get("model_data")):
+            if fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_image'))):
                 return current_zkp.create_response({
                     'response': response_b64.decode(),
                     'signature': response_signature_b64.decode()
                 })
             else:
                 raise cherrypy.HTTPError(401, message="Authentication failed")
-
         else:
             raise cherrypy.HTTPError(403, message="Authentication method does not correspond with this endpoint")
 
@@ -357,7 +352,7 @@ class IdP(Asymmetric_IdP):
 
             elif method == 'fingerprint':
                 fingerprint = Fingerprint(current_zkp.username, save_fingerprint_func=save_fingerprint)
-                status = fingerprint.register_new_user(request_args.get('model_data'))
+                status = fingerprint.register_new_user(base64.b64decode(request_args.get('fingerprint_image')))
 
                 return current_zkp.create_response({
                     'status': status,
