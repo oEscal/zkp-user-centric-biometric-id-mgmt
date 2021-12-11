@@ -630,7 +630,7 @@ class HelperApp(object):
             #         print(np.linalg.norm(np.asarray(current_features)-np.asarray(features[-1])))
             #     features.append(current_features)
 
-            exit(1)
+            # exit(1)
 
             ciphered_params = self.cipher_auth.create_response({
                 'features': features

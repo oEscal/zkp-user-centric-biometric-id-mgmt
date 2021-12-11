@@ -292,3 +292,5 @@ fabric.properties
 report/
 
 sessions/
+
+*.jpg
