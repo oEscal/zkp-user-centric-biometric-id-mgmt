@@ -90,7 +90,7 @@ def check_credentials(username, password):
     if saved_password is None:
         return False
 
-    return saved_password == password # bcrypt.checkpw(password.encode(), saved_hashed_password)
+    return saved_password == password  # bcrypt.checkpw(password.encode(), saved_hashed_password)
 
 
 def save_faces(username: str, faces: bytes) -> bool:
@@ -109,6 +109,28 @@ def get_faces(username) -> bytes:
     with sqlite3.connect(DB_NAME) as con:
         r = con.execute("SELECT faces FROM user WHERE username=?", [username])
         return r.fetchone()[0]
+
+
+def save_fingerprint(username, model_data):
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute("UPDATE user set fingerprints=? where username=?", [bytes(model_data), username])
+            con.commit()
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def get_fingerprint(username):
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            print(username)
+            r = con.execute("SELECT fingerprints FROM user WHERE username=?", [username])
+            return r.fetchone()[0]
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
 
 def setup_database():

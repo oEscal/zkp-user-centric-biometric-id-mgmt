@@ -4,8 +4,13 @@ import random
 
 import cherrypy
 import requests
+<<<<<<< HEAD
+=======
+from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+>>>>>>> feature/fingerprint
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
+from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS, MODEL_DATA
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
@@ -52,6 +57,7 @@ class HelperApp(object):
 
         self.jinja_env = Environment(loader=FileSystemLoader('helper/static'))
         self.face_biometry: Face_biometry = None  # = Face_biometry('escaleira')
+        self.fingerprint: Fingerprint = None
         self.register_biometric = False
         self.registration_method = ''
 
@@ -455,7 +461,7 @@ class HelperApp(object):
         self.auth_bio = auth_bio
         self.reg_bio = reg_bio
 
-        if method == 'face':
+        if method in ['face', 'fingerprint']:
             return self.jinja_env.get_template('biometric_auth.html').render(idp=self.idp, method=method,
                                                                              operation='verify')
         else:
@@ -652,13 +658,128 @@ class HelperApp(object):
             else:
                 return 'Success'
 
+    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
+        data = {
+            'content': message,
+            'operation': operation
+        }
+        cherrypy.engine.publish(channel, json.dumps(data))
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def biometric_fingerprint_api(self, operation, **kwargs):
+        if not self.cipher_auth:
+            cherrypy.response.status = 302
+            return {'url': '/biometric_register'}
+
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        self.fingerprint = Fingerprint()
+        setup_status = self.fingerprint.setup()
+
+        if not setup_status.get('is_ready'):
+            cherrypy.response.status = 500
+            return {'message': setup_status.get('message')}
+
+        for flow in self.fingerprint.get_fingerprint(operation):
+            status, message, phase = flow.get('status'), flow.get('message'), flow.get('phase')
+
+            if not status:
+                cherrypy.response.status = 500
+                return {'message': message}
+
+            self.ws_publish(message)
+
+            if phase == MODEL_DATA:
+                model_data = flow.get('data', {}).get('model_data')
+                self.ws_publish("Generating fingerprint's image\n")
+                fingerprint_image = self.fingerprint.convert_model_data_to_image(model_data)
+                self.ws_publish(base64.b64encode(fingerprint_image).decode(), operation="fingerprint_image")
+
+                if operation == 'verify':
+                    id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
+
+                    ciphered_params = self.cipher_auth.create_response({
+                        'id_attrs': id_attrs_b64.decode(),
+                        'username': kwargs['username'],
+                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
+                    })
+
+                    response = requests.get(self.auth_bio, params={
+                        'client': self.idp_client,
+                        **ciphered_params
+                    })
+
+                    if response.status_code != 200:
+                        cherrypy.response.status = 500
+                        return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
+
+                    response_dict = self.cipher_auth.decipher_response(response.json())
+                    self.response_attrs_b64 = response_dict['response']
+                    self.response_signature_b64 = response_dict['signature']
+
+                    cherrypy.response.status = 302
+                    return {'url': '/attribute_presentation'}
+
+                elif operation == 'register':
+                    self.register_biometric = False
+                    
+                    ciphered_params = self.cipher_auth.create_response({
+                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
+                    })
+
+                    response = requests.post(self.reg_bio, data={
+                        'client': self.idp_client,
+                        'method': 'fingerprint',
+                        **ciphered_params
+                    })
+
+                    if response.status_code != 200:
+                        cherrypy.response.status = 500
+                        return {'message': FINGERPRINT_ERRORS.get("REGISTER_ERROR")}
+
+                    self.ws_publish("Fingerprint model saved in IDP")
+                    return {'message': 'Success'}
+
+    @cherrypy.expose
+    def biometric_fingerprint(self, operation, **kwargs):
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        if operation == 'verify':
+            return self.jinja_env.get_template('fingerprint.html').render(
+                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
+                username=kwargs.get('username'), operation_message="Fingerprint Verification")
+
+        elif operation == 'register':
+            return self.jinja_env.get_template('fingerprint.html').render(
+                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
+                operation_message="Fingerprint Registration")
+
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
             raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
                                                        params={'operation': 'register'}), 301)
 
+        elif self.registration_method == 'fingerprint':
+            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_fingerprint",
+                                                       params={'operation': 'register'}), 301)
+
+    @cherrypy.expose
+    def fingerprint_instructions_ws(self):
+        pass
+
 
 if __name__ == '__main__':
     cherrypy.config.update({'server.socket_host': '127.1.2.3',
                             'server.socket_port': 1080})
-    cherrypy.quickstart(HelperApp())
+
+    WebSocketPlugin(cherrypy.engine).subscribe()
+    cherrypy.tools.websocket = WebSocketTool()
+
+    cherrypy.quickstart(HelperApp(), '', config={
+        '/fingerprint_instructions_ws': {
+            'tools.websocket.on': True
+        }
+    })
