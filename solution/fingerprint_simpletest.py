@@ -158,8 +158,8 @@ def enroll_finger(location):
 
 def save_fingerprint_image(filename):
     """Scan fingerprint then save image to filename."""
-    while finger.get_image():
-        pass
+    # while finger.get_image():
+    #     pass
 
     # let PIL take care of the image headers and file structure
     from PIL import Image  # pylint: disable=import-outside-toplevel
@@ -168,7 +168,7 @@ def save_fingerprint_image(filename):
     pixeldata = img.load()
     mask = 0b00001111
     result = finger.get_fpdata(sensorbuffer="image")
-    print(len(result))
+    # print(len(result))
 
     # this block "unpacks" the data received from the fingerprint
     #   module then copies the image data to the image placeholder "img"

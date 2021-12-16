@@ -19,7 +19,7 @@ ERROR = 5
 
 
 class Fingerprint:
-    def __init__(self, n_img=10):
+    def __init__(self, n_img=20):
         self.n_img = n_img
         self.uart = None
         self.finger = None
@@ -38,6 +38,8 @@ class Fingerprint:
 
     def get_fingerprint(self, operation):
         n = self.n_img
+        if operation == 'verify':
+            n = 5
         try:
             for finger_img in range(1, n + 1):
                 # get fingerprint image

@@ -10,7 +10,7 @@ FINGERPRINT_ERRORS = {
     'LOGIN_ERROR': "The IdP was no able to login with face"
 }
 
-SCORE_THRESHOLD = 21
+SCORE_THRESHOLD = 25
 
 
 class Fingerprint:
