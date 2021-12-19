@@ -684,6 +684,7 @@ class HelperApp(object):
                 model_data = flow.get('data', {}).get('model_data')
                 self.ws_publish("Generating fingerprint's image\n")
                 fingerprint_image = self.fingerprint.convert_model_data_to_image(model_data)
+                fingerprint_descriptors = self.fingerprint.get_descriptors(fingerprint_image)
                 self.ws_publish(base64.b64encode(fingerprint_image).decode(), operation="fingerprint_image")
 
                 if operation == 'verify':
@@ -692,7 +693,7 @@ class HelperApp(object):
                     ciphered_params = self.cipher_auth.create_response({
                         'id_attrs': id_attrs_b64.decode(),
                         'username': kwargs['username'],
-                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
+                        'fingerprint_descriptors': base64.b64encode(fingerprint_descriptors).decode()
                     })
 
                     response = requests.get(self.auth_bio, params={
@@ -713,9 +714,9 @@ class HelperApp(object):
 
                 elif operation == 'register':
                     self.register_biometric = False
-                    
+
                     ciphered_params = self.cipher_auth.create_response({
-                        'fingerprint_image': base64.b64encode(fingerprint_image).decode()
+                        'fingerprint_descriptors': base64.b64encode(fingerprint_descriptors).decode()
                     })
 
                     response = requests.post(self.reg_bio, data={

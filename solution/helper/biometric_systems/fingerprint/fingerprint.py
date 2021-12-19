@@ -1,8 +1,12 @@
 import adafruit_fingerprint
 import serial
-import time
+import cv2
+import numpy as np
 import io
+import pickle
 from PIL import Image
+from fingerprint_enhancer import enhance_Fingerprint
+from fingerprint_feature_extractor import extract_minutiae_features
 
 FINGERPRINT_ERRORS = {
     'NOT_READY': "Error in sensor's initialization; Refresh the page to try again",
@@ -98,3 +102,38 @@ class Fingerprint:
         except Exception as e:
             print(f'Error {e}')
             return None
+
+    def __convert_bytes_to_numpy_array(self, content):
+        np_arr = np.fromstring(content, np.uint8)
+        return cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
+
+    def __generate_key_points(self, fingerprint_features):
+        features_terminations, features_bifurcations = fingerprint_features
+        kp_terminations, kp_bifurcations = [], []
+
+        for entry in features_terminations:
+            x, y = entry.locX, entry.locY
+            kp_terminations.append(cv2.KeyPoint(y, x, 1))
+        for entry in features_bifurcations:
+            x, y = entry.locX, entry.locY
+            kp_bifurcations.append(cv2.KeyPoint(y, x, 1))
+
+        return kp_terminations, kp_bifurcations
+
+    def __create_descriptor(self, image, key_points):
+        orb = cv2.ORB_create()
+        _, descriptor = orb.compute(image, key_points)
+        return descriptor
+
+    def get_descriptors(self, img_content, pickled=True):
+        image = enhance_Fingerprint(self.__convert_bytes_to_numpy_array(img_content))
+        kp_terminations, kp_bifurcations = self.__generate_key_points(
+            extract_minutiae_features(image, spuriousMinutiaeThresh=10))
+
+        descriptor_terminations = self.__create_descriptor(image, kp_terminations)
+        descriptor_bifurcations = self.__create_descriptor(image, kp_bifurcations)
+
+        if pickled:
+            return pickle.dumps((descriptor_terminations, descriptor_bifurcations))
+
+        return descriptor_terminations, descriptor_bifurcations
