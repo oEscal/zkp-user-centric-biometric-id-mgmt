@@ -4,17 +4,28 @@ import fingerprint_feature_extractor
 import numpy as np
 from skimage.morphology import skeletonize, thin
 from statistics import mean
+import ImageChops
 import matplotlib.pyplot as plt
 
-img = cv2.imread('2.png', 0)
+a = cv2.imread('enroll_1.png', 0)
+a[a != 0] = 1
+b = cv2.imread('enroll_2.png', 0)
+b[b != 0] = 1
+c = cv2.imread('enroll_3.png', 0)
+c[c != 0] = 1
+
+imgs = [b, c]
+print(a, a.shape)
+for img in imgs:
+    print(np.sum((a - img) ** 2))
+
+exit()
 out = fingerprint_enhancer.enhance_Fingerprint(img)
 
 FeaturesTerminations, FeaturesBifurcations = fingerprint_feature_extractor.extract_minutiae_features(img,
                                                                                                      showResult=False,
                                                                                                      spuriousMinutiaeThresh=10)
 
-print(FeaturesTerminations[0].__dict__)
-print(FeaturesBifurcations[0].__dict__)
 key_points = []
 for termination in FeaturesBifurcations:
     x, y, orientation = termination.locX, termination.locY, termination.Orientation
@@ -27,10 +38,10 @@ _, des = orb.compute(img, key_points)
 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 matches = sorted(bf.match(des, des), key=lambda match: match.distance)
 
+#
+
+
 mean_score = mean([match.distance for match in matches])
-
-print(mean_score)
-
 
 img4 = cv2.drawKeypoints(img, key_points, outImage=None)
 img5 = cv2.drawKeypoints(img, key_points, outImage=None)

@@ -52,5 +52,5 @@ class Fingerprint:
         terminations_mean_score = mean([match.distance for match in terminations_matches])
         bifurcations_mean_score = mean([match.distance for match in bifurcations_matches])
 
-        print(terminations_mean_score, bifurcations_mean_score)
+        print(f'{terminations_mean_score=}', f'{bifurcations_mean_score=}')
         return terminations_mean_score < TERMINATIONS_THRESHOLD and bifurcations_mean_score < BIFURCATIONS_THRESHOLD

@@ -7,7 +7,8 @@ import requests
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
-from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS, MODEL_DATA
+from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS, IMAGE_DATA, \
+    DESCRIPTORS_DATA
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
@@ -680,12 +681,17 @@ class HelperApp(object):
 
             self.ws_publish(message)
 
-            if phase == MODEL_DATA:
-                model_data = flow.get('data', {}).get('model_data')
-                self.ws_publish("Generating fingerprint's image\n")
-                fingerprint_image = self.fingerprint.convert_model_data_to_image(model_data)
-                fingerprint_descriptors = self.fingerprint.get_descriptors(fingerprint_image)
+            if phase == IMAGE_DATA:
+                fingerprint_image = flow.get('data', {}).get('image_data')
+                # fingerprint_descriptors = self.fingerprint.get_descriptors(fingerprint_image)
                 self.ws_publish(base64.b64encode(fingerprint_image).decode(), operation="fingerprint_image")
+
+            elif phase == DESCRIPTORS_DATA:
+                fingerprint_descriptors = [base64.b64encode(desc).decode() for desc in flow.get('data', [])]
+
+                if not fingerprint_descriptors:
+                    cherrypy.response.status = 500
+                    return {'message': FINGERPRINT_ERRORS.get("DESCRIPTORS_ERROR")}
 
                 if operation == 'verify':
                     id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
@@ -693,7 +699,7 @@ class HelperApp(object):
                     ciphered_params = self.cipher_auth.create_response({
                         'id_attrs': id_attrs_b64.decode(),
                         'username': kwargs['username'],
-                        'fingerprint_descriptors': base64.b64encode(fingerprint_descriptors).decode()
+                        'fingerprint_descriptors': fingerprint_descriptors
                     })
 
                     response = requests.get(self.auth_bio, params={
@@ -716,7 +722,7 @@ class HelperApp(object):
                     self.register_biometric = False
 
                     ciphered_params = self.cipher_auth.create_response({
-                        'fingerprint_descriptors': base64.b64encode(fingerprint_descriptors).decode()
+                        'fingerprint_descriptors': fingerprint_descriptors
                     })
 
                     response = requests.post(self.reg_bio, data={
