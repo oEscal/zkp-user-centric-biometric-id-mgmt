@@ -28,7 +28,7 @@ DESCRIPTORS_DATA = 8
 
 
 class Fingerprint:
-    def __init__(self, n_img=3, scans_per_image=5):
+    def __init__(self, n_img=1, scans_per_image=5):
         self.n_img = n_img
         self.scans_per_image = scans_per_image
         self.uart = None
@@ -112,12 +112,12 @@ class Fingerprint:
         return img
 
     def __is_different_enough(self, current_image, other_images, difference_threshold=15000):
-        current_image = self.__normalize_image(current_image)
-
-        for img in other_images:
-            # print(np.sum((current_image - self.__normalize_image(img)) ** 2))
-            if np.sum((current_image - self.__normalize_image(img)) ** 2) <= difference_threshold:
-                return False
+        # current_image = self.__normalize_image(current_image)
+        #
+        # for img in other_images:
+        #     # print(np.sum((current_image - self.__normalize_image(img)) ** 2))
+        #     if np.sum((current_image - self.__normalize_image(img)) ** 2) <= difference_threshold:
+        #         return False
         return True
 
     def convert_model_data_to_image(self, model_data):

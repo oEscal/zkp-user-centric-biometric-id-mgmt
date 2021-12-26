@@ -1,85 +1,100 @@
 import fingerprint_enhancer
 import cv2
 import fingerprint_feature_extractor
-import numpy as np
-from skimage.morphology import skeletonize, thin
 from statistics import mean
-import ImageChops
 import matplotlib.pyplot as plt
 
-a = cv2.imread('enroll_1.png', 0)
-a[a != 0] = 1
-b = cv2.imread('enroll_2.png', 0)
-b[b != 0] = 1
-c = cv2.imread('enroll_3.png', 0)
-c[c != 0] = 1
 
-imgs = [b, c]
-print(a, a.shape)
-for img in imgs:
-    print(np.sum((a - img) ** 2))
+def get_key_points(features_terminations, features_bifurcations):
+    key_points_bifurcations = []
+    key_points_terminations = []
+    for bifurcation in features_bifurcations:
+        x, y, orientation = bifurcation.locX, bifurcation.locY, bifurcation.Orientation
+        a, b, c = orientation
+        major_angle = max((a - b, b - c, c - a))
+        key_points_bifurcations.append(cv2.KeyPoint(y, x, 1, angle=major_angle))
 
-exit()
-out = fingerprint_enhancer.enhance_Fingerprint(img)
+    for termination in features_terminations:
+        x, y, orientation = termination.locX, termination.locY, termination.Orientation[0]
+        key_points_terminations.append(cv2.KeyPoint(y, x, 1, angle=orientation))
 
-FeaturesTerminations, FeaturesBifurcations = fingerprint_feature_extractor.extract_minutiae_features(img,
-                                                                                                     showResult=False,
-                                                                                                     spuriousMinutiaeThresh=10)
-
-key_points = []
-for termination in FeaturesBifurcations:
-    x, y, orientation = termination.locX, termination.locY, termination.Orientation
-    key_points.append(cv2.KeyPoint(y, x, 1))
-
-orb = cv2.ORB_create()
-# Compute descriptors
-_, des = orb.compute(img, key_points)
-
-bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-matches = sorted(bf.match(des, des), key=lambda match: match.distance)
-
-#
+    return key_points_terminations, key_points_bifurcations
 
 
-mean_score = mean([match.distance for match in matches])
+def generate_descriptors(image, kp_terminations, kp_bifurcations):
+    orb_bifurcations = cv2.ORB_create()
+    _, desc_bifurcations = orb_bifurcations.compute(image, kp_bifurcations)
 
-img4 = cv2.drawKeypoints(img, key_points, outImage=None)
-img5 = cv2.drawKeypoints(img, key_points, outImage=None)
-f, axarr = plt.subplots(1, 2)
-axarr[0].imshow(img4)
-axarr[1].imshow(img5)
-plt.show()
-# Plot matches
-img3 = cv2.drawMatches(img, key_points, img, key_points, matches, flags=2, outImg=None)
-plt.imshow(img3)
-plt.show()
+    orb_terminations = cv2.ORB_create()
+    _, desc_terminations = orb_terminations.compute(image, kp_terminations)
 
-exit()
-print(FeaturesTerminations[0].__dict__)
-print(FeaturesBifurcations[0].__dict__)
+    return desc_terminations, desc_bifurcations
 
-exit()
-img = np.array(out, dtype=np.uint8)
-# Threshold
-ret, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-# Normalize to 0 and 1 range
-img[img == 255] = 1
 
-# Thinning
-skeleton = skeletonize(img)
-skeleton = np.array(skeleton, dtype=np.uint8)
-# Harris corners
-harris_corners = cv2.cornerHarris(img, 3, 3, 0.04)
-harris_normalized = cv2.normalize(harris_corners, 0, 255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32FC1)
-threshold_harris = 125
-# Extract key_points
-key_points = []
-for x in range(0, harris_normalized.shape[0]):
-    for y in range(0, harris_normalized.shape[1]):
-        print(harris_normalized[x][y])
-        if harris_normalized[x][y] > threshold_harris:
-            key_points.append(cv2.KeyPoint(y, x, 1))
-# Define descriptor
-orb = cv2.ORB_create()
-# Compute descriptors
-_, des = orb.compute(img, key_points)
+def plot_data(img1, img2, kp1, kp2, matches_terminations, matches_bifurcations):
+    kp_terminations1, kp_bifurcations1 = kp1
+    kp_terminations2, kp_bifurcations2 = kp2
+
+    plot_img_terminations_1 = cv2.drawKeypoints(img1, kp_terminations1, outImage=None)
+    plot_img_bifurcations_1 = cv2.drawKeypoints(img1, kp_bifurcations1, outImage=None)
+    plot_img_terminations_2 = cv2.drawKeypoints(img2, kp_terminations2, outImage=None)
+    plot_img_bifurcations_2 = cv2.drawKeypoints(img2, kp_bifurcations2, outImage=None)
+
+    f, ax_array = plt.subplots(2, 2)
+    ax_array[0][0].imshow(plot_img_terminations_1)
+    ax_array[0][1].imshow(plot_img_terminations_2)
+
+    ax_array[1][0].imshow(plot_img_bifurcations_1)
+    ax_array[1][1].imshow(plot_img_bifurcations_2)
+
+    plt.show()
+
+    f, ax_array = plt.subplots(1, 2)
+
+    img_terminations_matches = cv2.drawMatches(img1, kp_terminations1, img2, kp_terminations2, matches_terminations,
+                                               flags=2, outImg=None)
+    img_bifurcations_matches = cv2.drawMatches(img1, kp_bifurcations1, img2, kp_bifurcations2, matches_bifurcations,
+                                               flags=2, outImg=None)
+
+    ax_array[0].imshow(img_terminations_matches)
+    ax_array[1].imshow(img_bifurcations_matches)
+
+    plt.show()
+
+
+def main():
+    img1 = cv2.imread('enroll_1.png', 0)
+    img2 = cv2.imread('enroll_3.png', 0)
+
+    out1 = fingerprint_enhancer.enhance_Fingerprint(img1)
+    out2 = fingerprint_enhancer.enhance_Fingerprint(img2)
+
+    features_terminations1, features_bifurcations1 = fingerprint_feature_extractor.extract_minutiae_features(out1)
+    features_terminations2, features_bifurcations2 = fingerprint_feature_extractor.extract_minutiae_features(out2)
+
+    kp_terminations1, kp_bifurcations1 = get_key_points(features_terminations1, features_bifurcations1)
+    kp_terminations2, kp_bifurcations2 = get_key_points(features_terminations2, features_bifurcations2)
+
+    desc_terminations1, desc_bifurcations1 = generate_descriptors(out1, kp_terminations1, kp_bifurcations1)
+    desc_terminations2, desc_bifurcations2 = generate_descriptors(out2, kp_terminations2, kp_bifurcations2)
+
+    matcher_terminations = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matcher_bifurcations = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+    matches_terminations = sorted(matcher_terminations.match(desc_terminations1, desc_terminations2),
+                                  key=lambda match: match.distance)
+    matches_bifurcations = sorted(matcher_bifurcations.match(desc_bifurcations1, desc_bifurcations2),
+                                  key=lambda match: match.distance)
+
+    score_terminations = mean([match.distance for match in matches_terminations])
+    score_bifurcations = mean([match.distance for match in matches_bifurcations])
+
+    print(f'{score_terminations=}')
+    print(f'{score_bifurcations=}')
+
+    # plot_data(img1, img2, (kp_terminations1, kp_bifurcations1,), (kp_terminations2, kp_bifurcations2,),
+    #           matches_terminations, matches_bifurcations)
+
+
+if __name__ == '__main__':
+    main()
