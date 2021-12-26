@@ -1,4 +1,6 @@
-from multiprocessing import Process, Manager, Queue, Lock
+import base64
+import time
+from multiprocessing import Process, Manager, Queue
 
 import cv2
 import face_recognition
@@ -11,7 +13,8 @@ def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> lis
 
 
 class Face_biometry:
-    def __init__(self, min_distance=0.35):
+    def __init__(self, ws, min_distance=0.35):
+        self.ws = ws
         self.min_distance = min_distance
 
         self.__take_shot = False
@@ -21,8 +24,6 @@ class Face_biometry:
         _, self.frame = self.video_capture.read()
 
         self.frames_queue = Queue(1)
-        self.start = Lock()
-        self.start.acquire()
 
     def __camera(self):
         while not self.__stop_camera:
@@ -35,20 +36,14 @@ class Face_biometry:
 
     def __interface(self):
         while not self.__stop_camera:
-            if cv2.waitKey(1) & 0xFF == ord('s'):
-                try:
-                    self.start.release()
-                except ValueError:
-                    pass
+            face_b64 = base64.b64encode(cv2.imencode('.jpg', self.frame)[1]).decode()
+            self.ws(face_b64, operation="fingerprint_image")
 
-            if self.frame is not None:
-                cv2.imshow('Video', self.frame)
+    def __get_face_features(self, final_face_features, number_faces, frames_queue):
+        # wait a sec to allow the camera to warmup
+        time.sleep(1)
 
-        cv2.destroyAllWindows()
-
-    def __get_face_features(self, final_face_features, number_faces, frames_queue, start):
         n = 0
-        start.acquire()
         while True:
             frame = frames_queue.get()
             if frame is not None:
@@ -69,6 +64,7 @@ class Face_biometry:
                         n += 1
                         print("Face Added")
                         final_face_features.append(current_features)
+                        self.ws(f"Face {len(final_face_features)}/{number_faces} captured\n")
 
                 if len(final_face_features) >= number_faces:
                     print("Finished")
@@ -77,7 +73,7 @@ class Face_biometry:
     def get_facial_features(self, number_faces) -> list[list[float]]:
         manager = Manager()
         final_face_features = manager.list()
-        threads = [Process(target=self.__get_face_features, args=(final_face_features, number_faces, self.frames_queue, self.start)),
+        threads = [Process(target=self.__get_face_features, args=(final_face_features, number_faces, self.frames_queue)),
                    Thread(target=self.__camera),
                    Thread(target=self.__interface)]
 
@@ -94,6 +90,7 @@ class Face_biometry:
 
         # join threads
         for t in threads:
+            # TODO - MUDAR ISTO
             t.join()
             self.__stop_camera = True
             print("Thread joined")

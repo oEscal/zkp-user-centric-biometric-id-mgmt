@@ -1,8 +1,10 @@
 import base64
 import json
 import random
+import time
 
 import cherrypy
+import cv2
 import requests
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 
@@ -17,7 +19,7 @@ from jinja2 import Environment, FileSystemLoader
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
-NUMBER_FACES_REGISTER = 7
+NUMBER_FACES_REGISTER = 14
 
 
 HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
@@ -97,7 +99,6 @@ class HelperApp(object):
                              "on the identification process!",
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
                                  "this is the IdP we are contacting is not a trusted one!",
-            'face_register_error': "There was an error registering this user's face on the selected IdP."
         }
         return self.jinja_env.get_template('error.html').render(message=errors[error_id])
 
@@ -593,13 +594,32 @@ class HelperApp(object):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
-        self.face_biometry = Face_biometry()
+        data_render = {
+            'ws_url': f"{HELPER_URL_WS}/{self.instructions_ws.__name__}",
+            'operation': operation,
+            'operation_message': "Face Verification" if operation == 'verify' else "Face Registration"
+        }
+        if 'username' in kwargs:
+            data_render['username'] = kwargs['username']
+
+        return self.jinja_env.get_template('face.html').render(**data_render)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def biometric_face_api(self, operation, **kwargs):
+        if not self.cipher_auth:
+            cherrypy.response.status = 302
+            return {'url': '/biometric_register'}
+
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        self.face_biometry = Face_biometry(ws=self.ws_publish)
 
         if operation == 'verify':
             if 'username' not in kwargs:
-                return self.jinja_env.get_template('biometric_auth.html').render(
-                    idps=self.master_password_manager.idps,
-                    message="Error: You must indicate the username you want to login with on this IdP!")
+                cherrypy.response.status = 500
+                return {'message': "The IdP was no able to login with face"}
 
             features = self.face_biometry.get_facial_features(number_faces=1)
 
@@ -620,13 +640,15 @@ class HelperApp(object):
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
                 # self.zkp_auth()
-                return "The IdP was no able to login with face"
+                cherrypy.response.status = 500
+                return {'message': "The IdP was no able to login with face"}
             else:
                 response_dict = self.cipher_auth.decipher_response(response.json())
                 self.response_attrs_b64 = response_dict['response']
                 self.response_signature_b64 = response_dict['signature']
 
-            raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
+            cherrypy.response.status = 302
+            return {'url': '/attribute_presentation'}
         elif operation == 'register':
             self.register_biometric = False
 
@@ -654,19 +676,11 @@ class HelperApp(object):
                 # TODO ->  ANALISAR MENSAGEM DE ERRO
                 print(f"Error received from idp on function <{self.biometric_face.__name__}>: "
                       f"<{response.status_code}: {response.reason}>")
-                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
-                                                           params={'error_id': 'face_register_error'}), 301)
+                cherrypy.response.status = 500
+                return {'message': "There was an error registering this user's face on the selected IdP."}
             else:
-                return 'Success'
+                return {'message': 'The faces where registered on the IdP with success!'}
 
-    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
-        data = {
-            'content': message,
-            'operation': operation
-        }
-        cherrypy.engine.publish(channel, json.dumps(data))
-
-    @cherrypy.expose
     @cherrypy.tools.json_out()
     def biometric_fingerprint_api(self, operation, **kwargs):
         if not self.cipher_auth:
@@ -750,12 +764,12 @@ class HelperApp(object):
 
         if operation == 'verify':
             return self.jinja_env.get_template('fingerprint.html').render(
-                ws_url=f'{HELPER_URL_WS}/fingerprint_instructions_ws', operation=operation,
+                ws_url=f'{HELPER_URL_WS}/{self.instructions_ws.__name__}', operation=operation,
                 username=kwargs.get('username'), operation_message="Fingerprint Verification")
 
         elif operation == 'register':
             return self.jinja_env.get_template('fingerprint.html').render(
-                ws_url=f'{HELPER_URL_WS}/fingerprint_instructions_ws', operation=operation,
+                ws_url=f'{HELPER_URL_WS}/{self.instructions_ws.__name__}', operation=operation,
                 operation_message="Fingerprint Registration")
 
     def __biometric_registration_final(self):
@@ -768,8 +782,15 @@ class HelperApp(object):
                                                        params={'operation': 'register'}), 301)
 
     @cherrypy.expose
-    def fingerprint_instructions_ws(self):
+    def instructions_ws(self):
         pass
+
+    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
+        data = {
+            'content': message,
+            'operation': operation
+        }
+        cherrypy.engine.publish(channel, json.dumps(data))
 
 
 if __name__ == '__main__':
@@ -780,7 +801,7 @@ if __name__ == '__main__':
     cherrypy.tools.websocket = WebSocketTool()
 
     cherrypy.quickstart(HelperApp(), '', config={
-        '/fingerprint_instructions_ws': {
+        f'/{HelperApp.instructions_ws.__name__}': {
             'tools.websocket.on': True
         }
     })

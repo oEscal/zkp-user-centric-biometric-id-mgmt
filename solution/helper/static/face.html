@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><b>Message</b></h5>
+            </div>
+            <div class="modal-body">
+                <p id="modal_message"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="close_modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('#close_modal').on('click', () => {
+        $('.modal').modal('hide');
+    })
+</script>
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <div class="row mb-4 px-3">
+            <h1>{{operation_message}}</h1>
+        </div>
+
+        <div class="form-group">
+            <div class="row mb-4 px-3 d-flex justify-content-center">
+                <h4><label for="instructions">Follow the instructions</label></h4>
+            </div>
+
+        </div>
+
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <textarea class="col-md-12 form-control" rows="10" id="instructions" readonly="readonly"></textarea>
+                    <div class="alert alert-warning col-md-12" role="alert" id="status">
+                        Running!
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <img id="fingerprint_img" class="col-md-12" alt="camera">
+                </div>
+                <button class="col-md-4 offset-4 center btn btn-success" id="start_btn">Start</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script type="application/javascript">
+    $(document).ready(function () {
+        $("#instructions").val("");
+        let url = '/biometric_face_api?operation={{operation}}';
+        {% if username %}
+        url = '/biometric_face_api?operation={{operation}}&username={{username}}';
+        {% endif %}
+
+        $("#start_btn").click(function () {
+            $.ajax({
+                'url': url,
+                type: 'GET',
+                success: (e) => {
+                    $("#status").removeClass("alert-warning");
+                    $("#status").addClass("alert-success");
+                    $("#status").text("Success!");
+                },
+                error: (e) => {
+                    if (e.status === 302) { //Redirection
+                        window.location.replace(e.responseJSON.url);
+                        return;
+                    }
+                    $("#status").removeClass("alert-warning");
+                    $("#status").addClass("alert-danger");
+                    $("#status").text("Error!");
+                    $("#modal_message").text(e.responseJSON.message);
+                    $('.modal').modal('show');
+                }
+            })
+
+            let ws = new WebSocket("{{ws_url}}");
+            ws.onmessage = function (evt) {
+                let data = JSON.parse(evt.data);
+                if (data.operation === 'instruction') {
+                    let instructions = $("#instructions");
+                    let value = instructions.val();
+                    instructions.val(`${value}${data.content}`);
+                    instructions.scrollTop(instructions[0].scrollHeight - instructions.height());
+                } else if (data.operation === 'fingerprint_image') {
+                    let image = data.content;
+                    $("#fingerprint_img").attr('src', `data:image/png;base64,${image}`)
+                    ws.send("True");
+                }
+            };
+            ws.onopen = function () {
+                console.log("Connecting to the instruction's web socket")
+            };
+        });
+    });
+</script>
+{% endblock %}
