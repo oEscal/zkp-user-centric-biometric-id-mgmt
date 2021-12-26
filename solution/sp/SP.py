@@ -26,6 +26,10 @@ IDP_PORT = 8082
 # noinspection HttpUrlsUsage
 IDP_URL = f"http://{IDP_HOST_NAME}:{IDP_PORT}"
 
+HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
+HELPER_PORT = 1080
+HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
+
 clients_auth: typing.Dict[str, dict] = dict()
 clients_idp: typing.Dict[str, str] = dict()
 
@@ -113,7 +117,7 @@ class SP(object):
 
             '''Note that if you want to other IdPs you must change this piece of code to send other possible IdPs'''
             clients_idp[__client_id] = IDP_URL
-            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/login",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/login",
                                                        params={
                                                            'sp': HOST_URL,
                                                            'idp': IDP_URL,
