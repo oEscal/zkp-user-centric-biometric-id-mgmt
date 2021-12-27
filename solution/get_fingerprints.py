@@ -1,15 +1,16 @@
 from pathlib import Path
+from PIL import Image
 import adafruit_fingerprint
 import serial
+import time
 
 IMAGES = 3
-SCANS_PER_IMAGE = 5
-DATA_FOLDER = 'fingerprints/'
+SCANS_PER_IMAGE = 10
+DATA_FOLDER = 'fingerprints'
 Path(DATA_FOLDER).mkdir(parents=True, exist_ok=True)
 
 
-# pylint: disable=too-many-statements
-def enroll_finger(finger, location):
+def enroll_finger(finger, finger_path_id):
     """Take a 2 finger images and template it, then store in 'location'"""
     for finger_img in range(1, IMAGES + 1):
         if finger_img == 1:
@@ -17,56 +18,70 @@ def enroll_finger(finger, location):
         else:
             print("Place same finger again...", end="", flush=True)
 
-        scan_counter = 0
+        scan_counter = 1
         while True:
-            if scan_counter == 5:
+            if scan_counter > SCANS_PER_IMAGE:
                 break
             i = finger.get_image()
             if i == adafruit_fingerprint.OK:
-                print("Image taken")
+                print(f"Scan {scan_counter}")
                 scan_counter += 1
             if i == adafruit_fingerprint.NOFINGER:
                 print(".", end="", flush=True)
-            elif i == adafruit_fingerprint.IMAGEFAIL:
-                print("Imaging error")
-                # return False
-            else:
-                print("Other error")
-                # return False
 
-        from PIL import Image
         img = Image.new("L", (256, 288), "white")
-        pixeldata = img.load()
+        pixel_data = img.load()
         mask = 0b00001111
         result = finger.get_fpdata("image")
         x = 0
-        # pylint: disable=invalid-name
         y = 0
-        # pylint: disable=consider-using-enumerate
         for i in range(len(result)):
-            pixeldata[x, y] = (int(result[i]) >> 4) * 17
+            pixel_data[x, y] = (int(result[i]) >> 4) * 17
             x += 1
-            pixeldata[x, y] = (int(result[i]) & mask) * 17
+            pixel_data[x, y] = (int(result[i]) & mask) * 17
             if x == 255:
                 x = 0
                 y += 1
             else:
                 x += 1
 
-        # import numpy as np
-        # pixeldata = np.asarray(pixeldata, dtype="uint8")
-        img.save(f'enroll_{finger_img}.png')
+        finger_path = f'{DATA_FOLDER}/{finger_img}_{finger_path_id}.png'
+        img.save(finger_path)
 
 
-def get_num():
-    """Use input() to get a valid number from 1 to 127. Retry till success!"""
-    i = 0
-    while (i > 127) or (i < 1):
+def finger_name():
+    menu = """
+    1) Thumb
+    2) Index finger
+    3) Middle finger
+    4) Ring finger
+    5) Little finger
+    >
+    """
+    while True:
         try:
-            i = int(input("Enter ID # from 1-127: "))
-        except ValueError:
-            pass
-    return i
+            finger_option = input(menu)
+            value = int(finger_option)
+            if value in range(1, 6):
+                break
+        except:
+            print("Invalid option")
+
+    return value
+
+
+def hand_side():
+    menu = """
+    l) left
+    r) right
+    >
+    """
+    while True:
+        side_option = input(menu).lower()
+        if side_option in ['l', 'r']:
+            break
+
+    return side_option
 
 
 def main():
@@ -77,25 +92,24 @@ def main():
         print("----------------")
         if finger.read_templates() != adafruit_fingerprint.OK:
             raise RuntimeError("Failed to read templates")
-        print("Fingerprint templates:", finger.templates)
-        print("e) enroll print")
-        print("f) find print")
-        print("d) delete print")
-        print("----------------")
-        c = input("> ")
 
-        if c == "e":
-            enroll_finger(get_num())
-        if c == "f":
-            if get_fingerprint():
-                print("Detected #", finger.finger_id, "with confidence", finger.confidence)
-            else:
-                print("Finger not found")
-        if c == "d":
-            if finger.delete_model(get_num()) == adafruit_fingerprint.OK:
-                print("Deleted!")
-            else:
-                print("Failed to delete")
+        print("Save fingerprint")
+        print("e) enroll print")
+        print("q) quit")
+        print("----------------")
+        option = input("> ")
+
+        if option == "e":
+            name = input("Name: \n> ")
+            side = hand_side()
+            finger_id = finger_name()
+            current_time = int(time.time())
+
+            finger_path_id = f'{name}_{side}_{finger_id}_{current_time}'
+            enroll_finger(finger, finger_path_id)
+        elif option == "q":
+            print("Quitting")
+            break
 
 
 if __name__ == '__main__':
