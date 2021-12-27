@@ -13,9 +13,10 @@ def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> lis
 
 
 class Face_biometry:
-    def __init__(self, ws, min_distance=0.35):
+    def __init__(self, ws, min_distance=0.35, path_save=''):
         self.ws = ws
         self.min_distance = min_distance
+        self.path_save = path_save
 
         self.__take_shot = False
         self.__stop_camera = False
@@ -61,13 +62,13 @@ class Face_biometry:
                             add_face = False
                             break
                     if add_face:
-                        cv2.imwrite(f'frame{n}.jpg', frame)
+                        cv2.imwrite(f'{self.path_save}frame{n}.jpg', frame)
                         face_b64 = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()
                         self.ws(face_b64, operation="new_face")
 
                         n += 1
-                        print("Face Added")
                         final_face_features.append(current_features)
+                        print(f"Face {len(final_face_features)}/{number_faces} captured")
                         self.ws(f"Face {len(final_face_features)}/{number_faces} captured\n")
 
                 if len(final_face_features) >= number_faces:
