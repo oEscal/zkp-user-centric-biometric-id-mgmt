@@ -39,6 +39,7 @@ def score_function(parameters, descriptors, descriptors_grouped_by_name):
             desc_terminations2, desc_bifurcations2 = descriptors[images[j]]
 
             params1, params2 = get_params_from_filename(images[i]), get_params_from_filename(images[j])
+
             if params1[1:-1] == params2[1:-1]:
                 y_true.append(1)
             else:
@@ -55,7 +56,9 @@ def score_function(parameters, descriptors, descriptors_grouped_by_name):
 
 
 def cb(x, convergence):
-    print(x)
+    terminations_threshold, bifurcations_threshold = x
+    print(f"{terminations_threshold=}")
+    print(f"{bifurcations_threshold=}")
 
 
 def main():
@@ -77,7 +80,7 @@ def main():
 
         descriptors_grouped_by_name[params].append(img)
 
-    bounds = [(0, 125)] * 2
+    bounds = [(0, 100)] * 2
 
     optimizer = differential_evolution(func=score_function, bounds=bounds,
                                        args=(descriptors, descriptors_grouped_by_name), workers=n_process,
@@ -89,3 +92,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# 3 -> 0.64
+# 10 -> 0.625

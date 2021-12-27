@@ -4,23 +4,24 @@ import adafruit_fingerprint
 import serial
 import time
 
-IMAGES = 3
+POSITIONS = 3
 SCANS_PER_IMAGE = 10
+# SCANS_PER_IMAGE_LIST = [2, 3, 5, 10, 15]
 DATA_FOLDER = 'fingerprints'
 Path(DATA_FOLDER).mkdir(parents=True, exist_ok=True)
 
 
-def enroll_finger(finger, finger_path_id):
+def enroll_finger(finger, finger_path_id, scans_per_image):
     """Take a 2 finger images and template it, then store in 'location'"""
-    for finger_img in range(1, IMAGES + 1):
+    for finger_img in range(1, POSITIONS + 1):
         if finger_img == 1:
-            print("Place finger on sensor...", end="", flush=True)
+            print(f"Place finger on sensor (Position {finger_img})...", end="", flush=True)
         else:
-            print("Place same finger again...", end="", flush=True)
+            print(f"Place same finger again (Position {finger_img})...", end="", flush=True)
 
         scan_counter = 1
         while True:
-            if scan_counter > SCANS_PER_IMAGE:
+            if scan_counter > scans_per_image:
                 break
             i = finger.get_image()
             if i == adafruit_fingerprint.OK:
@@ -106,7 +107,8 @@ def main():
             current_time = int(time.time())
 
             finger_path_id = f'{name}_{side}_{finger_id}_{current_time}'
-            enroll_finger(finger, finger_path_id)
+            enroll_finger(finger, finger_path_id, SCANS_PER_IMAGE)
+
         elif option == "q":
             print("Quitting")
             break
