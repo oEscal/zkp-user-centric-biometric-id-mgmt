@@ -1,3 +1,5 @@
+import os
+
 import fingerprint_enhancer
 import cv2
 import fingerprint_feature_extractor
@@ -8,7 +10,7 @@ import matplotlib.pyplot as plt
 def get_key_points(features_terminations, features_bifurcations):
     key_points_terminations = []
     key_points_bifurcations = []
-    
+
     for termination in features_terminations:
         x, y, orientation = termination.locX, termination.locY, termination.Orientation[0]
         key_points_terminations.append(cv2.KeyPoint(y, x, 1))
@@ -48,7 +50,7 @@ def plot_data(img1, img2, kp1, kp2, matches_terminations, matches_bifurcations):
     ax_array[1][0].imshow(plot_img_bifurcations_1)
     ax_array[1][1].imshow(plot_img_bifurcations_2)
 
-    plt.show()
+    plt.imsave('1.png')
 
     f, ax_array = plt.subplots(1, 2)
 
@@ -60,7 +62,7 @@ def plot_data(img1, img2, kp1, kp2, matches_terminations, matches_bifurcations):
     ax_array[0].imshow(img_terminations_matches)
     ax_array[1].imshow(img_bifurcations_matches)
 
-    plt.show()
+    plt.imsave('2.png')
 
 
 def extract_features(img):
@@ -98,12 +100,19 @@ def is_match(saved_descriptors, actual_descriptor, terminations_threshold, bifur
     return False
 
 
-import numpy as np
+def overall_image_quality(img):
+    features_terminations, features_bifurcations, _ = extract_features(img)
+    print(len(features_terminations), len(features_bifurcations))
 
 
 def main():
-    img1 = cv2.imread('fingerprints/1_rafael_l_2_1640576927.png', 0)
-    img2 = cv2.imread('fingerprints/2_rafael_l_2_1640576927.png', 0)
+    images = os.listdir('fingerprints')
+    img1 = images[0]
+    img2 = images[1]
+    print(img1, img2)
+
+    img1 = cv2.imread(f'fingerprints/{img1}', 0)
+    img2 = cv2.imread(f'fingerprints/{img2}', 0)
 
     features_terminations1, features_bifurcations1, out1 = extract_features(img1)
     features_terminations2, features_bifurcations2, out2 = extract_features(img2)

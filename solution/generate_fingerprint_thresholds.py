@@ -1,12 +1,13 @@
 from scipy.optimize import differential_evolution
-from sklearn.metrics import matthews_corrcoef
-from sample import extract_features, get_key_points, get_scores, generate_descriptors, is_match
+from sklearn.metrics import matthews_corrcoef, confusion_matrix
+from sample import extract_features, get_key_points, generate_descriptors, is_match
 import multiprocessing as mp
 import numpy as np
 import os
 import cv2
+import functools
 
-DATA_PATH = 'fingerprints'
+DATA_PATH = 'fingerprints_upscaled'
 
 
 def get_params_from_filename(file_name):
@@ -19,7 +20,7 @@ def generate_images_descriptors(images):
     for img in images:
         full_path = f'{DATA_PATH}/{img}'
 
-        image = cv2.imread(full_path)
+        image = cv2.imread(full_path, 0)
         features_terminations, features_bifurcations, enhanced_image = extract_features(image)
         kp_terminations, kp_bifurcations = get_key_points(features_terminations, features_bifurcations)
         desc_terminations, desc_bifurcations = generate_descriptors(enhanced_image, kp_terminations, kp_bifurcations)
@@ -28,7 +29,7 @@ def generate_images_descriptors(images):
     return descriptors
 
 
-def score_function(parameters, descriptors, descriptors_grouped_by_name):
+def score_function(parameters, descriptors, descriptors_grouped_by_name, generate_confusion_matrix=False):
     terminations_threshold, bifurcations_threshold = parameters
     y_true = []
     y_pred = []
@@ -52,17 +53,26 @@ def score_function(parameters, descriptors, descriptors_grouped_by_name):
                 prediction = -1
             y_pred.append(prediction)
 
+    if generate_confusion_matrix:
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        with open('confusion_matrix.log', 'a') as f:
+            f.write(f'{tn=} {fp=} {fn=} {tp=}\n')
+
     return 1 - matthews_corrcoef(y_true, y_pred)
 
 
-def cb(x, convergence):
+def cb(descriptors, descriptors_grouped_by_name, x, convergence):
     terminations_threshold, bifurcations_threshold = x
     print(f"{terminations_threshold=}")
     print(f"{bifurcations_threshold=}")
+    score_function(x, descriptors, descriptors_grouped_by_name, True)
+
 
 
 def main():
     images = os.listdir(DATA_PATH)
+    images = [x for x in images if 'rafael' in x or 'jose' in x]
+    print(len(images))
 
     n_process = mp.cpu_count()
     pool = mp.Pool(processes=n_process)
@@ -82,9 +92,10 @@ def main():
 
     bounds = [(0, 100)] * 2
 
+    cb_partial = functools.partial(cb, descriptors, descriptors_grouped_by_name)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
                                        args=(descriptors, descriptors_grouped_by_name), workers=n_process,
-                                       disp=True, maxiter=250, tol=0, callback=cb)
+                                       disp=True, maxiter=250, tol=0, callback=cb_partial)
 
     print(optimizer.x)
     print(optimizer.fun)
