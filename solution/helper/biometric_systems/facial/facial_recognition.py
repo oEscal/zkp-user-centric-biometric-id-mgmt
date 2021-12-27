@@ -26,10 +26,13 @@ class Face_biometry:
         self.frames_queue = Queue(1)
 
     def __camera(self):
+        init = time.time()
         while not self.__stop_camera:
             # Capture frame-by-frame
             _, self.frame = self.video_capture.read()
-            if self.frames_queue.empty():
+
+            # in the beginning, give a sec to warmup the camera
+            if self.frames_queue.empty() and time.time() - init > 1:
                 self.frames_queue.put(self.frame)
 
         self.video_capture.release()
@@ -41,8 +44,6 @@ class Face_biometry:
 
     def __get_face_features(self, final_face_features, number_faces, frames_queue):
         # wait a sec to allow the camera to warmup
-        time.sleep(1)
-
         n = 0
         while True:
             frame = frames_queue.get()
@@ -61,6 +62,9 @@ class Face_biometry:
                             break
                     if add_face:
                         cv2.imwrite(f'frame{n}.jpg', frame)
+                        face_b64 = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()
+                        self.ws(face_b64, operation="new_face")
+
                         n += 1
                         print("Face Added")
                         final_face_features.append(current_features)
@@ -68,6 +72,7 @@ class Face_biometry:
 
                 if len(final_face_features) >= number_faces:
                     print("Finished")
+                    self.ws(operation="finish")
                     break
 
     def get_facial_features(self, number_faces) -> list[list[float]]:

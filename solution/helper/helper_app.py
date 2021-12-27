@@ -1,12 +1,12 @@
 import base64
 import json
 import random
-import time
+from queue import Queue
 
 import cherrypy
-import cv2
 import requests
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+from ws4py.websocket import WebSocket
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
 from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS, MODEL_DATA
@@ -28,7 +28,17 @@ HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
 HELPER_URL_WS = f"ws://{HELPER_HOST_NAME}:{HELPER_PORT}"
 
 
+ws_queue = Queue()
+
+
+class ChatWebSocketHandler(WebSocket):
+    def received_message(self, m):
+        ws_queue.put(str(m))
+
+
 class HelperApp(object):
+    # global ws_queue
+
     def __init__(self):
         self.zkp: ZKP = None
 
@@ -597,7 +607,8 @@ class HelperApp(object):
         data_render = {
             'ws_url': f"{HELPER_URL_WS}/{self.instructions_ws.__name__}",
             'operation': operation,
-            'operation_message': "Face Verification" if operation == 'verify' else "Face Registration"
+            'operation_message': "Face Verification" if operation == 'verify' else "Face Registration",
+            'idp': self.idp
         }
         if 'username' in kwargs:
             data_render['username'] = kwargs['username']
@@ -622,6 +633,12 @@ class HelperApp(object):
                 return {'message': "The IdP was no able to login with face"}
 
             features = self.face_biometry.get_facial_features(number_faces=1)
+            while True:
+                if ws_queue.get() == 'send':
+                    break
+                elif ws_queue.get() == 'restart':
+                    cherrypy.response.status = 500
+                    return
 
             id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
 
@@ -653,13 +670,12 @@ class HelperApp(object):
             self.register_biometric = False
 
             features = self.face_biometry.get_facial_features(number_faces=NUMBER_FACES_REGISTER)
-            # for i in range(NUMBER_FACES_REGISTER):
-            #     current_features = self.face_biometry.get_facial_features()
-            #     if features:
-            #         print(np.linalg.norm(np.asarray(current_features)-np.asarray(features[-1])))
-            #     features.append(current_features)
-
-            # exit(1)
+            while True:
+                if ws_queue.get() == 'send':
+                    break
+                elif ws_queue.get() == 'restart':
+                    cherrypy.response.status = 500
+                    return
 
             ciphered_params = self.cipher_auth.create_response({
                 'features': features
@@ -785,7 +801,7 @@ class HelperApp(object):
     def instructions_ws(self):
         pass
 
-    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
+    def ws_publish(self, message='', operation='instruction', channel="websocket-broadcast"):
         data = {
             'content': message,
             'operation': operation
@@ -802,6 +818,7 @@ if __name__ == '__main__':
 
     cherrypy.quickstart(HelperApp(), '', config={
         f'/{HelperApp.instructions_ws.__name__}': {
-            'tools.websocket.on': True
+            'tools.websocket.on': True,
+            'tools.websocket.handler_cls': ChatWebSocketHandler
         }
     })
