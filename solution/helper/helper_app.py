@@ -7,8 +7,7 @@ import requests
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
-from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, FINGERPRINT_ERRORS, IMAGE_DATA, \
-    DESCRIPTORS_DATA
+from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, IMAGE_DATA
 from utils.utils import ZKP, overlap_intervals, \
     Cipher_Authentication, asymmetric_upload_derivation_key, create_get_url
 from helper.managers import Master_Password_Manager, Password_Manager
@@ -682,10 +681,11 @@ class HelperApp(object):
             self.ws_publish(message)
 
             if phase == IMAGE_DATA:
-                fingerprint_image = flow.get('data', {}).get('image_data')
+                fingerprint_image = flow.get('data')
                 # fingerprint_descriptors = self.fingerprint.get_descriptors(fingerprint_image)
                 self.ws_publish(base64.b64encode(fingerprint_image).decode(), operation="fingerprint_image")
 
+            """
             elif phase == DESCRIPTORS_DATA:
                 fingerprint_descriptors = [base64.b64encode(desc).decode() for desc in flow.get('data', [])]
 
@@ -737,6 +737,8 @@ class HelperApp(object):
 
                     self.ws_publish("Fingerprint model saved in IDP")
                     return {'message': 'Success'}
+                    
+                """
 
     @cherrypy.expose
     def biometric_fingerprint(self, operation, **kwargs):

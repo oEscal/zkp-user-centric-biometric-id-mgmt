@@ -294,3 +294,5 @@ report/
 sessions/
 fingerprints/
 fingerprints_upscaled/
+fingerprints_good/
+fingerprints_bad/

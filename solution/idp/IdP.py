@@ -4,6 +4,7 @@ import typing
 import uuid
 from datetime import datetime, timedelta
 from os import urandom
+from pathlib import Path
 
 import cherrypy
 from cryptography.exceptions import InvalidSignature
@@ -362,6 +363,7 @@ class IdP(Asymmetric_IdP):
 
 
 if __name__ == '__main__':
+    Path("idp/sessions").mkdir(parents=True, exist_ok=True)
     setup_database()
 
     cherrypy.config.update({

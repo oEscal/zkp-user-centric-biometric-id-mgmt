@@ -5,6 +5,7 @@ import cv2
 import fingerprint_feature_extractor
 from statistics import mean
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def get_key_points(features_terminations, features_bifurcations):
@@ -13,13 +14,13 @@ def get_key_points(features_terminations, features_bifurcations):
 
     for termination in features_terminations:
         x, y, orientation = termination.locX, termination.locY, termination.Orientation[0]
-        key_points_terminations.append(cv2.KeyPoint(y, x, 1))
+        key_points_terminations.append(cv2.KeyPoint(y, x, 1, orientation))
 
     for bifurcation in features_bifurcations:
         x, y, orientation = bifurcation.locX, bifurcation.locY, bifurcation.Orientation
         a, b, c = orientation
         major_angle = max((a - b, b - c, c - a))
-        key_points_bifurcations.append(cv2.KeyPoint(y, x, 1))
+        key_points_bifurcations.append(cv2.KeyPoint(y, x, 1, major_angle))
 
     return key_points_terminations, key_points_bifurcations
 
@@ -50,7 +51,7 @@ def plot_data(img1, img2, kp1, kp2, matches_terminations, matches_bifurcations):
     ax_array[1][0].imshow(plot_img_bifurcations_1)
     ax_array[1][1].imshow(plot_img_bifurcations_2)
 
-    plt.imsave('1.png')
+    plt.show()
 
     f, ax_array = plt.subplots(1, 2)
 
@@ -62,13 +63,18 @@ def plot_data(img1, img2, kp1, kp2, matches_terminations, matches_bifurcations):
     ax_array[0].imshow(img_terminations_matches)
     ax_array[1].imshow(img_bifurcations_matches)
 
-    plt.imsave('2.png')
+    plt.show()
 
 
-def extract_features(img):
+def extract_features(out, spurious_minutiae_thresh=10):
+    features_terminations, features_bifurcations = fingerprint_feature_extractor.extract_minutiae_features(out,
+                                                                                                           spuriousMinutiaeThresh=spurious_minutiae_thresh)
+    return features_terminations, features_bifurcations
+
+
+def enhance_image(img):
     out = fingerprint_enhancer.enhance_Fingerprint(img)
-    features_terminations, features_bifurcations = fingerprint_feature_extractor.extract_minutiae_features(out)
-    return features_terminations, features_bifurcations, out
+    return out
 
 
 def get_scores(descriptors_terminators, descriptors_bifurcations):
@@ -101,21 +107,61 @@ def is_match(saved_descriptors, actual_descriptor, terminations_threshold, bifur
 
 
 def overall_image_quality(img):
-    features_terminations, features_bifurcations, _ = extract_features(img)
-    print(len(features_terminations), len(features_bifurcations))
+    w, h = img.shape
+    non_zeros = np.count_nonzero(img == 0)
+    return non_zeros / (w * h)
+
+
+import shutil
+import multiprocessing as mp
+import numpy as np
+
+
+def function(images):
+    for img_path in images:
+        print(img_path)
+        full_path = f'fingerprints_upscaled/{img_path}'
+        img = cv2.imread(full_path, 0)
+        out = enhance_image(img)
+        if overall_image_quality(out) <= 0.725:
+            shutil.copyfile(full_path, f'fingerprints_good/{img_path}')
+        else:
+            shutil.copyfile(full_path, f'fingerprints_bad/{img_path}')
 
 
 def main():
-    images = os.listdir('fingerprints')
+    """
+    pool = mp.Pool(8)
+    # fingerprints_good/
+    # fingerprints_bad/
+    results = [pool.apply_async(function, args=(sub_images,)) for sub_images in
+               np.array_split(os.listdir('fingerprints_upscaled'), 8)]
+    results = [p.get() for p in results]
+
+    exit()
+    """
+    images = os.listdir('fingerprints_upscaled')
     img1 = images[0]
     img2 = images[1]
     print(img1, img2)
 
-    img1 = cv2.imread(f'fingerprints/{img1}', 0)
-    img2 = cv2.imread(f'fingerprints/{img2}', 0)
+    img1 = cv2.imread(f'fingerprints/1_rafael_l_5_1640623577.png', 0)
+    img2 = cv2.imread(f'fingerprints/1_rafael_l_5_1640623025.png', 0)
 
-    features_terminations1, features_bifurcations1, out1 = extract_features(img1)
-    features_terminations2, features_bifurcations2, out2 = extract_features(img2)
+    out1 = enhance_image(img1)
+    out2 = enhance_image(img2)
+
+    print(overall_image_quality(out1))
+    print(overall_image_quality(out2))
+
+    exit()
+    features_terminations1, features_bifurcations1 = extract_features(img1)
+    features_terminations2, features_bifurcations2 = extract_features(img2)
+
+    a, b = len(features_terminations1), len(features_bifurcations1)
+    c, d = len(features_terminations2), len(features_bifurcations2)
+    print(a, b, a + b)
+    print(c, d, c + d)
 
     kp_terminations1, kp_bifurcations1 = get_key_points(features_terminations1, features_bifurcations1)
     kp_terminations2, kp_bifurcations2 = get_key_points(features_terminations2, features_bifurcations2)
@@ -131,7 +177,7 @@ def main():
     print(f'{score_terminations=}')
     print(f'{score_bifurcations=}')
 
-    plot_data(img1, img2, (kp_terminations1, kp_bifurcations1,), (kp_terminations2, kp_bifurcations2,),
+    plot_data(out1, out2, (kp_terminations1, kp_bifurcations1,), (kp_terminations2, kp_bifurcations2,),
               matches_terminations, matches_bifurcations)
 
 

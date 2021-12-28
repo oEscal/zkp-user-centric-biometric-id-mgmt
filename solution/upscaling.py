@@ -10,8 +10,8 @@ FOLDER_NAME = 'fingerprints'
 
 def upscaler(images):
     sr = cv2.dnn_superres.DnnSuperResImpl_create()
-    sr.readModel('EDSR_x4.pb')
-    sr.setModel("edsr", 4)
+    sr.readModel('EDSR_x2.pb')
+    sr.setModel("edsr", 2)
 
     for img_path in images:
         print(img_path)

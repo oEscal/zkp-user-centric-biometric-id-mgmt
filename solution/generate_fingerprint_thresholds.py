@@ -1,13 +1,13 @@
 from scipy.optimize import differential_evolution
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
-from sample import extract_features, get_key_points, generate_descriptors, is_match
+from sample import extract_features, get_key_points, generate_descriptors, is_match, enhance_image
 import multiprocessing as mp
 import numpy as np
 import os
 import cv2
 import functools
 
-DATA_PATH = 'fingerprints_upscaled'
+DATA_PATH = 'fingerprints_good'
 
 
 def get_params_from_filename(file_name):
@@ -21,7 +21,8 @@ def generate_images_descriptors(images):
         full_path = f'{DATA_PATH}/{img}'
 
         image = cv2.imread(full_path, 0)
-        features_terminations, features_bifurcations, enhanced_image = extract_features(image)
+        enhanced_image = enhance_image(image)
+        features_terminations, features_bifurcations = extract_features(enhanced_image)
         kp_terminations, kp_bifurcations = get_key_points(features_terminations, features_bifurcations)
         desc_terminations, desc_bifurcations = generate_descriptors(enhanced_image, kp_terminations, kp_bifurcations)
         descriptors[img] = (desc_terminations, desc_bifurcations,)
@@ -68,10 +69,9 @@ def cb(descriptors, descriptors_grouped_by_name, x, convergence):
     score_function(x, descriptors, descriptors_grouped_by_name, True)
 
 
-
 def main():
     images = os.listdir(DATA_PATH)
-    images = [x for x in images if 'rafael' in x or 'jose' in x]
+    images = [x for x in images]
     print(len(images))
 
     n_process = mp.cpu_count()
@@ -103,6 +103,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# 3 -> 0.64
-# 10 -> 0.625
