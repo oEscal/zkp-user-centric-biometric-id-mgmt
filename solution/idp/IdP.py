@@ -25,6 +25,10 @@ HOST_PORT = 8082
 # noinspection HttpUrlsUsage
 HOST_URL = f"http://{HOST_NAME}:{HOST_PORT}"
 
+HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
+HELPER_PORT = 1080
+HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
+
 MIN_ITERATIONS_ALLOWED = 300
 MAX_ITERATIONS_ALLOWED = 1000
 KEYS_TIME_TO_LIVE = 10  # minutes
@@ -87,13 +91,13 @@ class IdP(Asymmetric_IdP):
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    def login(self, method='fingerprint'):
+    def login(self, method='face'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
         # TODO -> MUDAR ISTO
         zkp_values[client_id] = ZKP_IdP(method=method, key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
-        raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/authenticate",
+        raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/authenticate",
                                                    params={
                                                        'max_iterations': MAX_ITERATIONS_ALLOWED,
                                                        'min_iterations': MIN_ITERATIONS_ALLOWED,

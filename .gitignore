@@ -285,6 +285,7 @@ crashlytics-build.properties
 fabric.properties
 
 
+.idea/
 
 ####### project
 **/accounts/
@@ -296,3 +297,5 @@ fingerprints/
 fingerprints_upscaled/
 fingerprints_good/
 fingerprints_bad/
+
+*.jpg

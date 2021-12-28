@@ -1,10 +1,12 @@
 import base64
 import json
 import random
+from queue import Queue
 
 import cherrypy
 import requests
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+from ws4py.websocket import WebSocket
 
 from helper.biometric_systems.facial.facial_recognition import Face_biometry
 from helper.biometric_systems.fingerprint.fingerprint import Fingerprint, IMAGE_DATA
@@ -13,13 +15,30 @@ from utils.utils import ZKP, overlap_intervals, \
 from helper.managers import Master_Password_Manager, Password_Manager
 from jinja2 import Environment, FileSystemLoader
 
+
 MIN_ITERATIONS_ALLOWED = 200
 MAX_ITERATIONS_ALLOWED = 500
 
-NUMBER_FACES_REGISTER = 7
+NUMBER_FACES_REGISTER = 14
+
+
+HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
+HELPER_PORT = 1080
+HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
+HELPER_URL_WS = f"ws://{HELPER_HOST_NAME}:{HELPER_PORT}"
+
+
+ws_queue = Queue()
+
+
+class ChatWebSocketHandler(WebSocket):
+    def received_message(self, m):
+        ws_queue.put(str(m))
 
 
 class HelperApp(object):
+    # global ws_queue
+
     def __init__(self):
         self.zkp: ZKP = None
 
@@ -90,7 +109,6 @@ class HelperApp(object):
                              "on the identification process!",
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
                                  "this is the IdP we are contacting is not a trusted one!",
-            'face_register_error': "There was an error registering this user's face on the selected IdP."
         }
         return self.jinja_env.get_template('error.html').render(message=errors[error_id])
 
@@ -141,7 +159,7 @@ class HelperApp(object):
                 aes_key = self.password_manager.decrypt(base64.urlsafe_b64decode(response_dict['ciphered_aes_key']))
             except Exception as e:
                 print(f"Error in function <{self.asymmetric_identification.__name__}>: <{e}>")
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'asy_error_decrypt'}), 301)
 
             iv = base64.urlsafe_b64decode(response_dict['iv'])
@@ -159,7 +177,7 @@ class HelperApp(object):
     def zkp_auth(self, restart=False):
         # verify if zkp was already done previously
         if not restart and self.zkp is not None:
-            raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                        params={'error_id': 'zkp_inf_cycle'}), 301)
 
         self.zkp = ZKP(self.password_manager.password)
@@ -197,7 +215,7 @@ class HelperApp(object):
                 data_send['response'] = challenge_response
             else:
                 print(f"Error received from idp: <{response.status_code}: {response.reason}>")
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'zkp_idp_error'}), 301)
 
         if self.zkp.all_ok:
@@ -219,14 +237,14 @@ class HelperApp(object):
 
             if response.status_code != 200:
                 print(f"Error received from idp: <{response.status_code}: {response.reason}>")
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'zkp_save_keys'}), 301)
 
             response = asymmetric_cipher_auth.decipher_response(self.cipher_auth.decipher_response(response.json()))
             if 'status' in response and bool(response['status']):
                 self.password_manager.save_private_key(user_id=response['user_id'], time_to_live=float(response['ttl']))
         else:
-            raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                        params={'error_id': 'zkp_auth_error'}), 301)
 
         # if the authentication is done for the registration with biometrics, redirect
@@ -276,7 +294,7 @@ class HelperApp(object):
                                                  idp_user=idp_user, idp=self.idp)
 
         if not self.password_manager.load_password():
-            raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                        params={'error_id': 'load_pass_error'}), 301)
         else:
             if not self.password_manager.load_private_key():
@@ -468,7 +486,7 @@ class HelperApp(object):
                                                  min(MAX_ITERATIONS_ALLOWED, self.max_idp_iterations))
             else:
                 self.iterations = 0
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'idp_iterations'}), 301)
 
             # verify if the user is authenticated
@@ -477,7 +495,7 @@ class HelperApp(object):
 
             if self.register_biometric:
                 self.zkp_auth()
-                # raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
+                # raise cherrypy.HTTPRedirect(create_get_url("{HELPER_URL}/biometric_face",
                 #                                            params={'username': '', 'operation': 'register'}), 301)
 
             return self.jinja_env.get_template('select_idp_user.html').render(
@@ -572,7 +590,7 @@ class HelperApp(object):
 
             # load password
             if not self.password_manager.load_password():
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
+                raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'load_pass_error'}), 301)
 
             self.registration_method = kwargs['method']
@@ -586,15 +604,41 @@ class HelperApp(object):
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
 
-        self.face_biometry = Face_biometry()
+        data_render = {
+            'ws_url': f"{HELPER_URL_WS}/{self.instructions_ws.__name__}",
+            'operation': operation,
+            'operation_message': "Face Verification" if operation == 'verify' else "Face Registration",
+            'idp': self.idp
+        }
+        if 'username' in kwargs:
+            data_render['username'] = kwargs['username']
+
+        return self.jinja_env.get_template('face.html').render(**data_render)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def biometric_face_api(self, operation, **kwargs):
+        if not self.cipher_auth:
+            cherrypy.response.status = 302
+            return {'url': '/biometric_register'}
+
+        if cherrypy.request.method != 'GET':
+            raise cherrypy.HTTPError(405)
+
+        self.face_biometry = Face_biometry(ws=self.ws_publish)
 
         if operation == 'verify':
             if 'username' not in kwargs:
-                return self.jinja_env.get_template('biometric_auth.html').render(
-                    idps=self.master_password_manager.idps,
-                    message="Error: You must indicate the username you want to login with on this IdP!")
+                cherrypy.response.status = 500
+                return {'message': "The IdP was no able to login with face"}
 
-            features = self.face_biometry.get_facial_features()
+            features = self.face_biometry.get_facial_features(number_faces=1)
+            while True:
+                if ws_queue.get() == 'send':
+                    break
+                elif ws_queue.get() == 'restart':
+                    cherrypy.response.status = 500
+                    return
 
             id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
 
@@ -613,19 +657,25 @@ class HelperApp(object):
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
                 # self.zkp_auth()
-                return "The IdP was no able to login with face"
+                cherrypy.response.status = 500
+                return {'message': "The IdP was no able to login with face"}
             else:
                 response_dict = self.cipher_auth.decipher_response(response.json())
                 self.response_attrs_b64 = response_dict['response']
                 self.response_signature_b64 = response_dict['signature']
 
-            raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
+            cherrypy.response.status = 302
+            return {'url': '/attribute_presentation'}
         elif operation == 'register':
             self.register_biometric = False
 
-            features = []
-            for i in range(NUMBER_FACES_REGISTER):
-                features.append(self.face_biometry.get_facial_features())
+            features = self.face_biometry.get_facial_features(number_faces=NUMBER_FACES_REGISTER)
+            while True:
+                if ws_queue.get() == 'send':
+                    break
+                elif ws_queue.get() == 'restart':
+                    cherrypy.response.status = 500
+                    return
 
             ciphered_params = self.cipher_auth.create_response({
                 'features': features
@@ -642,19 +692,11 @@ class HelperApp(object):
                 # TODO ->  ANALISAR MENSAGEM DE ERRO
                 print(f"Error received from idp on function <{self.biometric_face.__name__}>: "
                       f"<{response.status_code}: {response.reason}>")
-                raise cherrypy.HTTPRedirect(create_get_url(f"http://zkp_helper_app:1080/error",
-                                                           params={'error_id': 'face_register_error'}), 301)
+                cherrypy.response.status = 500
+                return {'message': "There was an error registering this user's face on the selected IdP."}
             else:
-                return 'Success'
+                return {'message': 'The faces where registered on the IdP with success!'}
 
-    def ws_publish(self, message, operation='instruction', channel="websocket-broadcast"):
-        data = {
-            'content': message,
-            'operation': operation
-        }
-        cherrypy.engine.publish(channel, json.dumps(data))
-
-    @cherrypy.expose
     @cherrypy.tools.json_out()
     def biometric_fingerprint_api(self, operation, **kwargs):
         if not self.cipher_auth:
@@ -747,37 +789,45 @@ class HelperApp(object):
 
         if operation == 'verify':
             return self.jinja_env.get_template('fingerprint.html').render(
-                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
+                ws_url=f'{HELPER_URL_WS}/{self.instructions_ws.__name__}', operation=operation,
                 username=kwargs.get('username'), operation_message="Fingerprint Verification")
 
         elif operation == 'register':
             return self.jinja_env.get_template('fingerprint.html').render(
-                ws_url='ws://zkp_helper_app:1080/fingerprint_instructions_ws', operation=operation,
+                ws_url=f'{HELPER_URL_WS}/{self.instructions_ws.__name__}', operation=operation,
                 operation_message="Fingerprint Registration")
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
-            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_face",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/biometric_face",
                                                        params={'operation': 'register'}), 301)
 
         elif self.registration_method == 'fingerprint':
-            raise cherrypy.HTTPRedirect(create_get_url("http://zkp_helper_app:1080/biometric_fingerprint",
+            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/biometric_fingerprint",
                                                        params={'operation': 'register'}), 301)
 
     @cherrypy.expose
-    def fingerprint_instructions_ws(self):
+    def instructions_ws(self):
         pass
+
+    def ws_publish(self, message='', operation='instruction', channel="websocket-broadcast"):
+        data = {
+            'content': message,
+            'operation': operation
+        }
+        cherrypy.engine.publish(channel, json.dumps(data))
 
 
 if __name__ == '__main__':
-    cherrypy.config.update({'server.socket_host': '127.1.2.3',
-                            'server.socket_port': 1080})
+    cherrypy.config.update({'server.socket_host': HELPER_HOST_NAME,
+                            'server.socket_port': HELPER_PORT})
 
     WebSocketPlugin(cherrypy.engine).subscribe()
     cherrypy.tools.websocket = WebSocketTool()
 
     cherrypy.quickstart(HelperApp(), '', config={
-        '/fingerprint_instructions_ws': {
-            'tools.websocket.on': True
+        f'/{HelperApp.instructions_ws.__name__}': {
+            'tools.websocket.on': True,
+            'tools.websocket.handler_cls': ChatWebSocketHandler
         }
     })

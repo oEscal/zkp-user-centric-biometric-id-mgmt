@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><b>Message</b></h5>
+            </div>
+            <div class="modal-body">
+                <p id="modal_message"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="close_modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('#close_modal').on('click', () => {
+        $('.modal').modal('hide');
+    })
+</script>
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+
+        <div class="row mb-4 px-3">
+            <h1>{{operation_message}}</h1>
+        </div>
+        <div id="capture_div">
+        <div class="form-group">
+            <div class="row mb-4 px-3 d-flex justify-content-center">
+                <h2><label for="instructions">Follow the instructions</label></h2>
+            </div>
+
+        </div>
+
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <textarea class="col-md-12 form-control" rows="10" id="instructions" readonly="readonly"></textarea>
+                    <div class="alert alert-warning col-md-12" role="alert" id="status">
+                        Running!
+                    </div>
+                </div>
+                <div class="col-md-6 py-2">
+                    <img id="fingerprint_img" class="col-md-12" alt="camera">
+                </div>
+                <button class="col-md-4 offset-4 center btn btn-success" id="start_btn">Start</button>
+            </div>
+        </div>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        </div>
+
+        <div class="container" style="display: none;" id="all_faces_cont">
+            <div class="form-group">
+                <div class="row mb-4 px-3 d-flex justify-content-center">
+                    <h3><label for="instructions">Faces obtained</label></h3>
+                </div>
+
+            </div>
+            <div class="container" id="faces">
+            </div>
+            <br>
+            <br>
+
+            <div id="last_info" class="form-group" style="display: none;">
+                <div class="row mb-4 px-3">
+                    <h4>The facial features of the above faces will be sent to the Identity Provider '<a href="{{idp}}">{{idp}}</a>'
+                    </h4>
+                    <p>You can <b>accept</b> to send these features, <b>retry</b> the capture process or <b>deny</b></p>
+                </div>
+
+                <div class="row px-3 mb-4 d-flex justify-content-center ">
+                    <button id="send_btn" name="allow" class="btn btn-success col-md-1">Accept</button> &nbsp;
+                    <button id="retry_btn" name="deny" class="btn btn-warning col-md-1">Retry</button>
+                    <button id="deny_btn" name="deny" class="btn btn-danger col-md-1">Deny</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script type="application/javascript">
+    $(document).ready(function () {
+        $("#instructions").val("");
+        let url = '/biometric_face_api?operation={{operation}}';
+        {% if username %}
+        url = '/biometric_face_api?operation={{operation}}&username={{username}}';
+        {% endif %}
+
+        let restart = false;
+
+        $("#start_btn").click(function () {
+            $.ajax({
+                'url': url,
+                type: 'GET',
+                success: (e) => {
+                    $("#status").removeClass("alert-warning");
+                    $("#status").addClass("alert-success");
+                    $("#status").text("Success!");
+                },
+                error: (e) => {
+                    if (e.status === 302) { //Redirection
+                        window.location.replace(e.responseJSON.url);
+                        return;
+                    }
+
+                    if (restart)
+                        location.reload();
+
+                    $("#status").removeClass("alert-warning");
+                    $("#status").addClass("alert-danger");
+                    $("#status").text("Error!");
+                    $("#modal_message").text(e.responseJSON.message);
+                    $('.modal').modal('show');
+                }
+            })
+
+            let ws = new WebSocket("{{ws_url}}");
+            ws.onmessage = function (evt) {
+                let data = JSON.parse(evt.data);
+                if (data.operation === 'instruction') {
+                    let instructions = $("#instructions");
+                    let value = instructions.val();
+                    instructions.val(`${value}${data.content}`);
+                    instructions.scrollTop(instructions[0].scrollHeight - instructions.height());
+                } else if (data.operation === 'fingerprint_image') {
+                    let image = data.content;
+                    $("#fingerprint_img").attr('src', `data:image/png;base64,${image}`)
+                } else if (data.operation === 'new_face') {
+                    let image = data.content;
+                    $("#all_faces_cont").show('slow');
+                    $("#faces").prepend($('<img>', {src: `data:image/png;base64,${image}`, class: 'col-md-2 py-1'}));
+                } else if (data.operation === 'finish') {
+                    $("#capture_div").hide('slow');
+                    $("#last_info").show('slow');
+                }
+            };
+            ws.onopen = function () {
+                console.log("Connecting to the instruction's web socket")
+            };
+
+            $("#send_btn").click(function() {
+                ws.send("send");
+            });
+
+            $("#retry_btn").click(function() {
+                ws.send("restart");
+                restart = true;
+            });
+        });
+    });
+</script>
+{% endblock %}
