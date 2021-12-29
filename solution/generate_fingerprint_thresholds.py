@@ -7,7 +7,7 @@ import os
 import cv2
 import functools
 
-DATA_PATH = 'fingerprints_good'
+DATA_PATH = 'fingerprints_upscaled'
 
 
 def get_params_from_filename(file_name):

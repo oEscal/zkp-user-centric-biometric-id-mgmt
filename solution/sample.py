@@ -126,13 +126,12 @@ def main():
     img1 = images[0]
     img2 = images[1]
 
-    img1 = cv2.imread(f'fingerprints/{img1}', 1)
+    print(img1)
+    img1 = cv2.imread(f'fingerprints/{img1}', 0)
+    img1 = enhance_image(img1)
+    print(overall_image_quality(img1))
+    exit()
     img2 = cv2.imread(f'fingerprints/{img2}', 1)
-    import time
-    start = time.time()
-    img1 = sr.upsample(img1)
-    img2 = sr.upsample(img2)
-    print(time.time() - start)
 
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
