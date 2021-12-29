@@ -8,11 +8,8 @@ FINGERPRINT_ERRORS = {
     'REGISTER_ERROR': "There was an error registering this user's fingerprint on the selected IdP.",
     'LOGIN_ERROR': "The IdP was no able to login with face"
 }
-TERMINATIONS_THRESHOLD = 25
-BIFURCATIONS_THRESHOLD = 25
-
-
-# SCORE_THRESHOLD = 25
+TERMINATIONS_THRESHOLD = 60
+BIFURCATIONS_THRESHOLD = 60
 
 
 class Fingerprint:
@@ -27,30 +24,45 @@ class Fingerprint:
 
         return self.save_fingerprint_func(self.username, fingerprint_descriptors)
 
-    def __convert_bytes_to_numpy_array(self, content):
+    def __convert_binary_data_to_image(self, content):
         np_arr = np.fromstring(content, np.uint8)
-        return cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
+        return cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+    def __get_scores(self, descriptors_terminators, descriptors_bifurcations):
+        desc_terminations1, desc_terminations2 = descriptors_terminators
+        desc_bifurcations1, desc_bifurcations2 = descriptors_bifurcations
+
+        matcher_terminations = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matcher_bifurcations = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+        matches_terminations = sorted(matcher_terminations.match(desc_terminations1, desc_terminations2),
+                                      key=lambda match: match.distance)
+        matches_bifurcations = sorted(matcher_bifurcations.match(desc_bifurcations1, desc_bifurcations2),
+                                      key=lambda match: match.distance)
+
+        score_terminations = mean([match.distance for match in matches_terminations])
+        score_bifurcations = mean([match.distance for match in matches_bifurcations])
+
+        return score_terminations, score_bifurcations
 
     def verify_user(self, fingerprint_descriptors):
         if not self.get_fingerprint_func:
             raise NotImplementedError("Get fingerprint function does not exists")
 
-        incoming_descriptor_terminations, incoming_descriptor_bifurcations = pickle.loads(fingerprint_descriptors)
-        saved_descriptor_terminations, saved_descriptor_bifurcations = pickle.loads(
-            self.get_fingerprint_func(self.username))
+        fingerprint_descriptors = pickle.loads(fingerprint_descriptors)
+        if len(fingerprint_descriptors) == 0:
+            raise Exception("Invalid descriptors")
 
-        terminations_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        terminations_matches = sorted(
-            terminations_matcher.match(saved_descriptor_terminations, incoming_descriptor_terminations),
-            key=lambda match: match.distance)
+        incoming_descriptor_terminations, incoming_descriptor_bifurcations = fingerprint_descriptors[0]
+        saved_descriptors = pickle.loads(self.get_fingerprint_func(self.username))
 
-        bifurcations_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        bifurcations_matches = sorted(
-            bifurcations_matcher.match(saved_descriptor_bifurcations, incoming_descriptor_bifurcations),
-            key=lambda match: match.distance)
-
-        terminations_mean_score = mean([match.distance for match in terminations_matches])
-        bifurcations_mean_score = mean([match.distance for match in bifurcations_matches])
-
-        print(f'{terminations_mean_score=}', f'{bifurcations_mean_score=}')
-        return terminations_mean_score < TERMINATIONS_THRESHOLD and bifurcations_mean_score < BIFURCATIONS_THRESHOLD
+        for descriptor in saved_descriptors:
+            score_terminations, score_bifurcations = self.__get_scores(
+                (descriptor[0], incoming_descriptor_terminations,),
+                (descriptor[1], incoming_descriptor_bifurcations,)
+            )
+            print(f'{score_terminations=}')
+            print(f'{score_bifurcations=}')
+            if score_terminations < TERMINATIONS_THRESHOLD and score_bifurcations < BIFURCATIONS_THRESHOLD:
+                return True
+        return False

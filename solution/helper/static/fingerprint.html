@@ -27,25 +27,52 @@
             <h1>{{operation_message}}</h1>
         </div>
 
-        <div class="form-group">
-            <div class="row mb-4 px-3 d-flex justify-content-center">
-                <h2><label for="instructions">Follow the instructions</label></h3>
-            </div>
-
-        </div>
 
         <div class="container">
-            <div class="row">
-                <div class="col-md-10">
+            <div class="row" id="instructions_container">
+                <div class="form-group">
+                    <div class="row mb-4 px-3 d-flex justify-content-center">
+                        <h2><label for="instructions">Follow the instructions</label></h2>
+                    </div>
+                </div>
+                <div class="col-md-10" id="instructions_div">
                     <textarea class="form-control" rows="10" id="instructions" readonly="readonly"></textarea>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-2" id="current_image_div">
                     <img src="img_girl.jpg" id="fingerprint_img" alt="Fingerprint Image">
                 </div>
-                <div class="col-md-10">
+                <div class="col-md-10" id="status_div">
                     <div class="alert alert-warning" role="alert" id="status">
                         Running!
                     </div>
+                </div>
+            </div>
+            <br><br>
+
+
+            <div class="container" id="fingers_container" style="display: none">
+                <div class="form-group">
+                    <div class="row mb-4 px-3 d-flex justify-content-center">
+                        <h3><label for="fingers">Fingerprint images obtained</label></h3>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="container d-flex justify-content-center" id="fingers"></div>
+                </div>
+            </div>
+            <br><br>
+            <div class="container" id="last_info" style="display: none;">
+                <div class="row mb-4 px-3">
+                    <h4>The fingerprint features of the above images will be sent to the Identity Provider '<a
+                            href="{{idp}}">{{idp}}</a>'
+                    </h4>
+                    <p>You can <b>accept</b> to send these features, <b>retry</b> the capture process or <b>deny</b></p>
+                </div>
+
+                <div class="row px-3 mb-4 d-flex justify-content-center ">
+                    <button id="send_btn" name="allow" class="btn btn-success col-md-1">Accept</button> &nbsp;
+                    <button id="retry_btn" name="deny" class="btn btn-warning col-md-1">Retry</button>
+                    <button id="deny_btn" name="deny" class="btn btn-danger col-md-1">Deny</button>
                 </div>
             </div>
 
@@ -83,21 +110,55 @@
         })
 
         let ws = new WebSocket("{{ws_url}}");
+        let last_image = undefined;
         ws.onmessage = function (evt) {
             let data = JSON.parse(evt.data);
             if (data.operation === 'instruction') {
-                let instructions = $("#instructions");
-                let value = instructions.val();
-                instructions.val(`${value}${data.content}`);
-                instructions.scrollTop(instructions[0].scrollHeight - instructions.height());
+                update_instructions(data.content);
             } else if (data.operation === 'fingerprint_image') {
                 let image = data.content;
                 $("#fingerprint_img").attr('src', `data:image/png;base64,${image}`)
+                last_image = image;
+            } else if (data.operation === 'valid_image') {
+                $("#fingers_container").show('slow');
+                $("#fingers").prepend($('<img>', {src: `data:image/png;base64,${last_image}`, class: 'col-md-3 py-1'}));
+                last_image = undefined;
+            } else if (data.operation === 'all_images') {
+                $("#current_image_div").hide('slow');
+                $("#instructions_div").attr('class', 'col-md-12');
+                $("#status_div").attr('class', 'col-md-12');
+                $("#last_info").show('slow');
             }
         };
         ws.onopen = function () {
             console.log("Connecting to the instruction's web socket")
         };
+
+        ws.onclose = function () {
+            console.log("Disconnecting");
+        }
+
+        $("#retry_btn").click(function () {
+            location.reload();
+            ws.send("stop");
+        });
+
+        $("#send_btn").click(function () {
+            ws.send("send");
+        });
+
+        $("#deny_btn").click(function () {
+            ws.send("stop");
+            window.location.replace("/");
+        });
+
+
+        function update_instructions(content) {
+            let instructions = $("#instructions");
+            let value = instructions.val();
+            instructions.val(`${value}${content}`);
+            instructions.scrollTop(instructions[0].scrollHeight - instructions.height());
+        }
     });
 </script>
 {% endblock %}
