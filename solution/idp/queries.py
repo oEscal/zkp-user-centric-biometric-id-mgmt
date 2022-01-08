@@ -114,7 +114,7 @@ def get_faces(username) -> bytes:
 def save_fingerprint(username, model_data):
     try:
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("UPDATE user set fingerprints=? where username=?", [bytes(model_data), username])
+            con.execute("UPDATE user set fingerprints=? where username=?", [model_data, username])
             con.commit()
         return True
     except Exception as e:
@@ -125,7 +125,6 @@ def save_fingerprint(username, model_data):
 def get_fingerprint(username):
     try:
         with sqlite3.connect(DB_NAME) as con:
-            print(username)
             r = con.execute("SELECT fingerprints FROM user WHERE username=?", [username])
             return r.fetchone()[0]
     except Exception as e:

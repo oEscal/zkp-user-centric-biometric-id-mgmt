@@ -1,28 +1,51 @@
 import adafruit_fingerprint
 import serial
-import time
+import cv2
+import numpy as np
 import io
+import multiprocessing as mp
+import pickle
 from PIL import Image
+from fingerprint_enhancer import enhance_Fingerprint
+from fingerprint_feature_extractor import extract_minutiae_features
 
 FINGERPRINT_ERRORS = {
     'NOT_READY': "Error in sensor's initialization; Refresh the page to try again",
     'REGISTER_ERROR': "There was an error registering this user's fingerprint on the selected IdP.",
-    'LOGIN_ERROR': "The IdP was no able to login with fingerprint"
+    'LOGIN_ERROR': "The IdP was no able to login with fingerprint",
+    'DESCRIPTORS_ERROR': "Error in descriptors generation"
 }
 
 FINGER_IMAGE_ACQUISITION = 0
 TEMPLATE_CREATION = 1
 FINGER_REMOVAL = 2
-MODEL_CREATION = 3
-MODEL_DATA = 4
+IMAGE_GENERATION = 3
+IMAGE_DATA = 4
 ERROR = 5
+LOW_QUALITY_IMAGE = 6
+SIMILAR_IMAGE = 7
+VALID_IMAGE = 8
+ALL_IMAGES_VALID = 9
+
+# IMAGE_DIFFERENCE = 6
+# # descriptors
+# DESCRIPTORS_GENERATION = 7
+# DESCRIPTORS_DATA = 8
+
+
+upscaler = cv2.dnn_superres.DnnSuperResImpl_create()
+upscaler.readModel('FSRCNN_x2.pb')
+upscaler.setModel("fsrcnn", 2)
 
 
 class Fingerprint:
-    def __init__(self, n_img=20):
+    def __init__(self, n_img=3, scans_per_image=10, n_processes=5):
         self.n_img = n_img
+        self.scans_per_image = scans_per_image
         self.uart = None
         self.finger = None
+        self.img_buffer = []
+        self.n_processes = n_processes
 
     def setup(self):
         try:
@@ -33,46 +56,94 @@ class Fingerprint:
             print(e)
             return {'is_ready': False, 'message': FINGERPRINT_ERRORS['NOT_READY']}
 
+    def clear_buffer(self):
+        self.img_buffer = []
+
     def create_yield_object(self, message, phase, status=True, data=None):
         return {'message': message, 'phase': phase, 'status': status, 'data': data}
 
     def get_fingerprint(self, operation):
+        self.img_buffer = []
         n = self.n_img
         if operation == 'verify':
-            n = 5
+            n = 1
         try:
-            for finger_img in range(1, n + 1):
+            yield self.create_yield_object(f"You will be asked to get {n} fingerprint scans in different positions\n",
+                                           FINGER_IMAGE_ACQUISITION)
+            finger_img = 1
+            while finger_img < (n + 1):
                 # get fingerprint image
-                yield self.create_yield_object("\nPlace finger on sensor...", FINGER_IMAGE_ACQUISITION)
+                yield self.create_yield_object(f"\nPlace finger on sensor ({finger_img})\n", FINGER_IMAGE_ACQUISITION)
 
-                while True:
+                scan_count = 0
+                while scan_count < self.scans_per_image:
                     finger_image = self.finger.get_image()
 
                     if finger_image == adafruit_fingerprint.OK:
-                        yield self.create_yield_object("Image taken\n", FINGER_IMAGE_ACQUISITION)
-                        break
+                        yield self.create_yield_object(f"Image taken (Scan {scan_count + 1})\n",
+                                                       FINGER_IMAGE_ACQUISITION)
+                        scan_count += 1
 
                     elif finger_image == adafruit_fingerprint.NOFINGER:
                         yield self.create_yield_object(".", FINGER_IMAGE_ACQUISITION)
 
-                    elif finger_image == adafruit_fingerprint.IMAGEFAIL:
-                        yield self.create_yield_object("Imaging error\n", FINGER_IMAGE_ACQUISITION, False)
-                        return
-
                     else:
-                        yield self.create_yield_object("Other error\n", FINGER_IMAGE_ACQUISITION, False)
-                        return
+                        yield self.create_yield_object("Internal error\n", FINGER_IMAGE_ACQUISITION, False)
 
-            msg = "\nCreating fingerprint model...\n"
-            if operation == 'verify':
-                msg = "\nChecking fingerprint model...\n"
-            yield self.create_yield_object(msg, MODEL_CREATION)
-            data = {'model_data': self.finger.get_fpdata("image")}
-            yield self.create_yield_object("", MODEL_DATA, data=data)
+                self.create_yield_object("Remove the finger\n", FINGER_IMAGE_ACQUISITION)
+
+                yield self.create_yield_object("\nGenerating image...\n", IMAGE_GENERATION)
+
+                image_binary = self.convert_model_data_to_image(self.finger.get_fpdata("image"))
+                image = self.__convert_binary_data_to_image(image_binary)
+
+                yield self.create_yield_object("", IMAGE_DATA, data=image_binary)
+
+                validation_status = self.valid_image(image, self.img_buffer)
+                if not validation_status.get('is_good'):
+                    yield self.create_yield_object("\nThis image has a low quality\nTry again...\n",
+                                                   LOW_QUALITY_IMAGE)
+                    continue
+
+                if not validation_status.get('is_different') and operation == 'verify':
+                    yield self.create_yield_object(
+                        "\nThis image is not different enough from the remaining\nTry again...\n",
+                        SIMILAR_IMAGE)
+                    continue
+
+                self.img_buffer.append(image)
+                finger_img += 1
+                yield self.create_yield_object("\nValid image\n", VALID_IMAGE)
+
+            yield self.create_yield_object("\nAll images taken\n", ALL_IMAGES_VALID)
 
         except Exception as e:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
+
+    def valid_image(self, current_image, other_images, difference_threshold=0.7, quality_threshold=0.75):
+        return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
+                'is_good': self.__is_good_enough(current_image, quality_threshold)}
+
+    def __convert_binary_data_to_image(self, binary_data):
+        return cv2.imdecode(np.fromstring(binary_data, np.uint8), cv2.IMREAD_COLOR)
+
+    def __is_different_enough(self, current_image, other_images, difference_threshold):
+        for img in other_images:
+            res = cv2.absdiff(current_image, img)
+            res = res.astype(np.uint8)
+
+            if np.count_nonzero(res) / res.size < difference_threshold:
+                return False
+
+        return True
+
+    def __is_good_enough(self, img, quality_threshold):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        image = self._enhance_image(img)
+        w, h = image.shape
+        non_zeros = np.count_nonzero(image == 0)
+        return non_zeros / (w * h) <= quality_threshold
 
     def convert_model_data_to_image(self, model_data):
         try:
@@ -98,3 +169,59 @@ class Fingerprint:
         except Exception as e:
             print(f'Error {e}')
             return None
+
+    def _enhance_image(self, img):
+        out = enhance_Fingerprint(img)
+        return out
+
+    def _upscale_image(self, img):
+        img = upscaler.upsample(img)
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    def _generate_key_points(self, features_terminations, features_bifurcations):
+        key_points_terminations = []
+        key_points_bifurcations = []
+
+        for termination in features_terminations:
+            x, y, angle = termination.locX, termination.locY, termination.Orientation[0]
+            key_points_terminations.append(cv2.KeyPoint(y, x, 1, angle=angle))
+
+        for bifurcation in features_bifurcations:
+            x, y, orientation = bifurcation.locX, bifurcation.locY, bifurcation.Orientation
+            a, b, c = orientation
+            major_angle = max((a - b, b - c, c - a))
+            key_points_bifurcations.append(cv2.KeyPoint(y, x, 1, angle=major_angle))
+
+        return key_points_terminations, key_points_bifurcations
+
+    def _generate_descriptors(self, image, kp_terminations, kp_bifurcations):
+        orb_terminations = cv2.ORB_create()
+        _, desc_terminations = orb_terminations.compute(image, kp_terminations)
+
+        orb_bifurcations = cv2.ORB_create()
+        _, desc_bifurcations = orb_bifurcations.compute(image, kp_bifurcations)
+
+        return desc_terminations, desc_bifurcations
+
+    def _descriptors_generation_workflow(self, img):
+        out = self._enhance_image(self._upscale_image(img))
+        features_terminations, features_bifurcations = extract_minutiae_features(out)
+        kp_terminations, kp_bifurcations = self._generate_key_points(features_terminations, features_bifurcations)
+        desc_terminations, desc_bifurcations = self._generate_descriptors(out, kp_terminations, kp_bifurcations)
+
+        return desc_terminations, desc_bifurcations
+
+    def get_descriptors(self, pickled=True):
+        if len(self.img_buffer) == 0:
+            return None
+
+        pool = mp.Pool(processes=self.n_processes)
+        descriptors = [pool.apply(self._descriptors_generation_workflow, args=(img,)) for img in self.img_buffer]
+        pool.close()
+        pool.join()
+        self.clear_buffer()
+
+        if pickled:
+            return pickle.dumps(descriptors)
+
+        return descriptors

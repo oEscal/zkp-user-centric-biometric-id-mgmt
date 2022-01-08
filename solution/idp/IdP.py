@@ -4,6 +4,7 @@ import typing
 import uuid
 from datetime import datetime, timedelta
 from os import urandom
+from pathlib import Path
 
 import cherrypy
 from cryptography.exceptions import InvalidSignature
@@ -24,7 +25,7 @@ HOST_PORT = 8082
 # noinspection HttpUrlsUsage
 HOST_URL = f"http://{HOST_NAME}:{HOST_PORT}"
 
-HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
+HELPER_HOST_NAME = "127.1.2.3"  # zkp_helper_app
 HELPER_PORT = 1080
 HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
 
@@ -90,7 +91,7 @@ class IdP(Asymmetric_IdP):
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    def login(self, method='face'):
+    def login(self, method='fingerprint'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
@@ -325,7 +326,7 @@ class IdP(Asymmetric_IdP):
         elif method == 'fingerprint':
             fingerprint = Fingerprint(username, get_fingerprint_func=get_fingerprint)
 
-            if fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_image'))):
+            if fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_descriptors'))):
                 return current_zkp.create_response({
                     'response': response_b64.decode(),
                     'signature': response_signature_b64.decode()
@@ -356,7 +357,7 @@ class IdP(Asymmetric_IdP):
 
             elif method == 'fingerprint':
                 fingerprint = Fingerprint(current_zkp.username, save_fingerprint_func=save_fingerprint)
-                status = fingerprint.register_new_user(base64.b64decode(request_args.get('fingerprint_image')))
+                status = fingerprint.register_new_user(base64.b64decode(request_args.get('fingerprint_descriptors')))
 
                 return current_zkp.create_response({
                     'status': status,
@@ -366,6 +367,7 @@ class IdP(Asymmetric_IdP):
 
 
 if __name__ == '__main__':
+    Path("idp/sessions").mkdir(parents=True, exist_ok=True)
     setup_database()
 
     cherrypy.config.update({
