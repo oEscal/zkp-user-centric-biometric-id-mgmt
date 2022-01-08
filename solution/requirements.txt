@@ -22,7 +22,7 @@ Mako==1.1.4
 MarkupSafe==2.0.0
 more-itertools==8.7.0
 numpy==1.21.4
-opencv-python==4.5.3.56
+opencv-python==4.5.4.58
 Pillow==8.4.0
 portend==2.7.1
 pycparser==2.20
