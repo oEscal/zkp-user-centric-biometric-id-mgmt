@@ -300,3 +300,4 @@ fingerprints_bad/
 
 *.jpg
 gathered_photos/*
+*.log

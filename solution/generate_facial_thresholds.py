@@ -15,6 +15,8 @@ DATA_PATH = 'helper/biometric_systems/facial/gathered_photos'
 LOGS_DIR = "logs"
 START = time.time()
 
+DECISIONS = ['mean', 'max', 'min', 'voting']
+
 
 def get_params_from_filename(file_name):
     image_index, name, side, finger_id, acquisition_time = file_name.split('_')
@@ -45,7 +47,7 @@ def score_function(parameters, all_features, generate_confusion_matrix=False):
                           get_faces_funct=lambda x: pickle.dumps([all_features[x][index_true]]))
             for user_to_verify in all_features:
                 for index_to_verify in range(index_true+1 if user_true == user_to_verify else 0, len(all_features[user_to_verify])):
-                    score = faces.verify_user(np.array(all_features[user_to_verify][index_to_verify]))
+                    scores = faces.verify_user_all_distances(np.array(all_features[user_to_verify][index_to_verify]))
                     prediction = int(score <= tolerance)
                     y_pred.append(1 if user_true == user_to_verify else -1)
                     y_true.append(prediction if prediction == 1 else -1)
@@ -103,7 +105,7 @@ def main():
 
     all_features = {k: v for x in results for k, v in x.items()}
 
-    bounds = [(0, 1)]
+    bounds = [(0, 1), tuple(range(len(DECISIONS)))]
 
     cb_partial = functools.partial(cb, all_features)
     optimizer = differential_evolution(func=score_function_2, bounds=bounds,
