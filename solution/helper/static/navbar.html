@@ -1,0 +1,29 @@
+<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-blue">
+    <a class="navbar-brand px-3" href="#" style="color:#fff;!important;"><b>Biometria</b></a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+            {% if add_idp_user %}
+            <li class="nav-item">
+                <a class="nav-link" href="/add_idp_user" style="color:#fff;!important;" id="add_idp_user">Add IDP
+                    user</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/update_idp_credentials" style="color:#fff;!important;">Update
+                    IDP user</a>
+            </li>
+            {% endif %}
+            {% if logout %}
+            <li class="nav-item">
+                <a class="nav-link" href="/logout" style="color:#fff;!important;">Logout</a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</nav>
+<script>
+    $("#add_idp_user").attr('href', `/add_idp_user?referer=${window.location.pathname}`)
+</script>

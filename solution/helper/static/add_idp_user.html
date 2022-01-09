@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div class="col-lg-12">
+    <div class="card2 card border-0 px-4 py-5">
+        <div class="row mb-4 px-3">
+            <h1>Add a new IDP user</h1>
+        </div>
+
+        <div class="row mb-4 px-3 d-flex justify-content-center">
+            <h3 class="mb-0 mr-4 mt-2">Select the IDP</h3>
+        </div>
+
+        <div class="row mb-4 px-3 d-flex justify-content-center">
+            <select class="form-select" aria-label="Default select example" id="idps_selector">
+                <option selected>IDP</option>
+                {% for idp in idps %}
+                <option value="{{idp}}">{{idp}}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+
+        <div style="padding-top: 20px; display: none" id="form_div">
+            <form action="/add_idp_user" method="post">
+                <div class="row mb-4 px-3 d-flex justify-content-center">
+                    <h3 class="mb-0 mr-4 mt-2">Register with a new user associated with the Identity
+                        Provider '<a href="#" id="idp_a"></a>':
+                    </h3>
+                </div>
+
+                <label for="username">Username: </label>
+                <input type="username" id="username" name="username"/>
+
+                <label for="password">Password: </label>
+                <input type="password" id="password" name="password"/>
+
+                <input type="hidden" id="referer_value" name="referer">
+                <input type="hidden" id="idp_value" name="idp">
+
+                <div class="row px-3 mb-4">
+                    <input type="submit" value="Register and Login" class="btn btn-blue btn-block text-center"/>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    let searchParams = new URLSearchParams(window.location.search);
+    $("#referer_value").val(searchParams.get('referer'));
+
+    $("#idps_selector").on('change', () => {
+        let selected_value = $("#idps_selector").find(":selected").text();
+        let form_div = $("#form_div");
+        if (selected_value === "IDP") {
+            form_div.hide('slow');
+            return;
+        }
+        form_div.show('slow');
+
+        let idp_a = $("#idp_a");
+        idp_a.attr('href', selected_value);
+        idp_a.text(selected_value);
+        $("#idp_value").val(selected_value);
+
+    })
+
+
+</script>
+{% endblock %}
