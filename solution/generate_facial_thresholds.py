@@ -81,7 +81,7 @@ def score_function(parameters, all_features, decision, generate_confusion_matrix
     if generate_confusion_matrix:
         with open(f'{LOGS_DIR}/confusion_matrix_{START}.log', 'a') as f:
             params = [int(i) for i in parameters[1:]]
-            f.write(f'{DECISION=} {tolerance=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
+            f.write(f'{decision=} {tolerance=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
 
     return (1 - (tp / (tp + fp))*math.sqrt(tp/(tp+fn))) if tp != 0 else 1 # 1 - mcc * (tp / (tp + fp))
 
