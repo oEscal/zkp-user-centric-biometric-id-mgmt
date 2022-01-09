@@ -73,7 +73,6 @@ def cb(descriptors, descriptors_grouped_by_name, x, convergence):
 
 def main():
     images = os.listdir(DATA_PATH)
-    images = [x for x in images]
     print(len(images))
 
     n_process = mp.cpu_count()
