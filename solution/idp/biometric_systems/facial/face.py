@@ -24,7 +24,7 @@ class Faces:
     def add(self, new_face_features: list[float]):
         self.pre_defined_faces.append(new_face_features)
 
-    def verify_user(self, face_cmp: np.ndarray) -> float:
+    def verify_user(self, face_cmp: np.ndarray, ) -> float:
         distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
         return float(distances.mean())
 

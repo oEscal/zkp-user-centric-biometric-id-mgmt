@@ -328,6 +328,8 @@ class HelperApp(object):
                                                  idp_user=username, idp=self.idp)
 
         self.password_manager.password = password.encode()
+
+        # redirect with 30* to the caller page (and delete the zkp_auth)
         self.zkp_auth()
 
     @cherrypy.expose
@@ -546,6 +548,10 @@ class HelperApp(object):
             username = kwargs['username']
             master_password = kwargs['password'].encode()
 
+            if not username or not master_password:
+                return self.jinja_env.get_template('register.html').render(
+                    message='Error: You must introduce a username and a password!')
+
             self.master_password_manager = Master_Password_Manager(username=username, master_password=master_password)
             if not self.master_password_manager.register_user():
                 return self.jinja_env.get_template('register.html').render(
@@ -637,7 +643,7 @@ class HelperApp(object):
             while True:
                 if ws_queue.get() == 'send':
                     break
-                elif ws_queue.get() == 'restart':
+                elif ws_queue.get() in ['restart', 'stop']:
                     cherrypy.response.status = 500
                     return
 
@@ -674,7 +680,7 @@ class HelperApp(object):
             while True:
                 if ws_queue.get() == 'send':
                     break
-                elif ws_queue.get() == 'restart':
+                elif ws_queue.get() in ['restart', 'stop']:
                     cherrypy.response.status = 500
                     return
 
