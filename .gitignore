@@ -297,5 +297,6 @@ fingerprints/
 fingerprints_upscaled/
 fingerprints_good/
 fingerprints_bad/
+fingerprints_old/
 
 *.jpg

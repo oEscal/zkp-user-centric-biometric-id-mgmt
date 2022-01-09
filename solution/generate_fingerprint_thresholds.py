@@ -1,3 +1,5 @@
+import json
+
 from scipy.optimize import differential_evolution
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
 from sample import extract_features, get_key_points, generate_descriptors, is_match, enhance_image
@@ -95,10 +97,13 @@ def main():
     cb_partial = functools.partial(cb, descriptors, descriptors_grouped_by_name)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
                                        args=(descriptors, descriptors_grouped_by_name), workers=n_process,
-                                       disp=True, maxiter=250, tol=0, callback=cb_partial)
+                                       disp=True, maxiter=100, tol=0, callback=cb_partial)
 
-    print(optimizer.x)
-    print(optimizer.fun)
+    with open('thresholds.json', 'w') as fp:
+        json.dump({
+            'x': optimizer.x.tolist(),
+            'fun': optimizer.fun.tolist()
+        }, fp)
 
 
 if __name__ == '__main__':

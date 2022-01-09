@@ -21,8 +21,8 @@ def upscaler(images):
         img = cv2.imread(full_path)
         quality_score = overall_image_quality(enhance_image(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)))
 
-        if quality_score > QUALITY_THRESHOLD:
-            continue
+        # if quality_score > QUALITY_THRESHOLD:
+        #     continue
         print(quality_score)
         print(img_path)
         up_img = sr.upsample(img)

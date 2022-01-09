@@ -84,10 +84,7 @@
 <script type="application/javascript">
     $(document).ready(function () {
         $("#instructions").val("");
-        let url = '/biometric_fingerprint_api?operation={{operation}}';
-        {% if username %}
-        url = '/biometric_fingerprint_api?operation={{operation}}&username={{username}}';
-        {% endif %}
+        let url = `/biometric_fingerprint_api${window.location.search}`;
         $.ajax({
             'url': url,
             type: 'GET',

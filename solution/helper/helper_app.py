@@ -701,9 +701,9 @@ class HelperApp(object):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def biometric_fingerprint_api(self, operation, **kwargs):
-        if not self.cipher_auth:
-            cherrypy.response.status = 302
-            return {'url': '/biometric_register'}
+        # if not self.cipher_auth:
+        #     cherrypy.response.status = 302
+        #     return {'url': '/biometric_register'}
 
         if cherrypy.request.method != 'GET':
             raise cherrypy.HTTPError(405)
@@ -715,7 +715,10 @@ class HelperApp(object):
             cherrypy.response.status = 500
             return {'message': setup_status.get('message')}
 
-        for flow in self.fingerprint.get_fingerprint(operation):
+        # Delete this
+        name, side, index_finger = kwargs.get('name'), kwargs.get('side'), kwargs.get('index')
+
+        for flow in self.fingerprint.get_fingerprint(operation, name, side, index_finger):
             status, message, phase = flow.get('status'), flow.get('message'), flow.get('phase')
 
             if not status:
@@ -796,60 +799,6 @@ class HelperApp(object):
 
             self.ws_publish("Fingerprint model saved in IDP")
             return {'message': 'Success'}
-        """
-        elif phase == DESCRIPTORS_DATA:
-            fingerprint_descriptors = [base64.b64encode(desc).decode() for desc in flow.get('data', [])]
-
-            if not fingerprint_descriptors:
-                cherrypy.response.status = 500
-                return {'message': FINGERPRINT_ERRORS.get("DESCRIPTORS_ERROR")}
-
-            if operation == 'verify':
-                id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
-
-                ciphered_params = self.cipher_auth.create_response({
-                    'id_attrs': id_attrs_b64.decode(),
-                    'username': kwargs['username'],
-                    'fingerprint_descriptors': fingerprint_descriptors
-                })
-
-                response = requests.get(self.auth_bio, params={
-                    'client': self.idp_client,
-                    **ciphered_params
-                })
-
-                if response.status_code != 200:
-                    cherrypy.response.status = 500
-                    return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
-
-                response_dict = self.cipher_auth.decipher_response(response.json())
-                self.response_attrs_b64 = response_dict['response']
-                self.response_signature_b64 = response_dict['signature']
-
-                cherrypy.response.status = 302
-                return {'url': '/attribute_presentation'}
-
-            elif operation == 'register':
-                self.register_biometric = False
-
-                ciphered_params = self.cipher_auth.create_response({
-                    'fingerprint_descriptors': fingerprint_descriptors
-                })
-
-                response = requests.post(self.reg_bio, data={
-                    'client': self.idp_client,
-                    'method': 'fingerprint',
-                    **ciphered_params
-                })
-
-                if response.status_code != 200:
-                    cherrypy.response.status = 500
-                    return {'message': FINGERPRINT_ERRORS.get("REGISTER_ERROR")}
-
-                self.ws_publish("Fingerprint model saved in IDP")
-                return {'message': 'Success'}
-                
-            """
 
     @cherrypy.expose
     def biometric_fingerprint(self, operation, **kwargs):
@@ -862,8 +811,6 @@ class HelperApp(object):
             'operation_message': "Fingerprint Verification" if operation == 'verify' else "Fingerprint Registration",
             'idp': self.idp
         }
-        if 'username' in kwargs:
-            data_render['username'] = kwargs['username']
 
         return self.jinja_env.get_template('fingerprint.html').render(**data_render)
 

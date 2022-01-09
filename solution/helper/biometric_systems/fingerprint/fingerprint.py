@@ -1,3 +1,5 @@
+import time
+
 import adafruit_fingerprint
 import serial
 import cv2
@@ -62,12 +64,13 @@ class Fingerprint:
     def create_yield_object(self, message, phase, status=True, data=None):
         return {'message': message, 'phase': phase, 'status': status, 'data': data}
 
-    def get_fingerprint(self, operation):
+    def get_fingerprint(self, operation, name, side, index_finger):
         self.img_buffer = []
         n = self.n_img
         if operation == 'verify':
             n = 1
         try:
+            start_time = int(time.time())
             yield self.create_yield_object(f"You will be asked to get {n} fingerprint scans in different positions\n",
                                            FINGER_IMAGE_ACQUISITION)
             finger_img = 1
@@ -105,13 +108,16 @@ class Fingerprint:
                                                    LOW_QUALITY_IMAGE)
                     continue
 
-                if not validation_status.get('is_different') and operation == 'verify':
+                if not validation_status.get('is_different'):
                     yield self.create_yield_object(
                         "\nThis image is not different enough from the remaining\nTry again...\n",
                         SIMILAR_IMAGE)
                     continue
 
                 self.img_buffer.append(image)
+                with open(f'fingerprints/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
+                    fp.write(image_binary)
+
                 finger_img += 1
                 yield self.create_yield_object("\nValid image\n", VALID_IMAGE)
 
@@ -121,7 +127,7 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.7, quality_threshold=0.75):
+    def valid_image(self, current_image, other_images, difference_threshold=0.70, quality_threshold=0.75):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 
@@ -133,7 +139,9 @@ class Fingerprint:
             res = cv2.absdiff(current_image, img)
             res = res.astype(np.uint8)
 
-            if np.count_nonzero(res) / res.size < difference_threshold:
+            score = np.count_nonzero(res) / res.size
+            print(score)
+            if score < difference_threshold:
                 return False
 
         return True

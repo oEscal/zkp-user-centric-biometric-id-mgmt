@@ -8,8 +8,8 @@ FINGERPRINT_ERRORS = {
     'REGISTER_ERROR': "There was an error registering this user's fingerprint on the selected IdP.",
     'LOGIN_ERROR': "The IdP was no able to login with face"
 }
-TERMINATIONS_THRESHOLD = 60
-BIFURCATIONS_THRESHOLD = 60
+TERMINATIONS_THRESHOLD = 57.430077307287604
+BIFURCATIONS_THRESHOLD = 38.22642860070694
 
 
 class Fingerprint:
