@@ -15,7 +15,9 @@ DATA_PATH = 'helper/biometric_systems/facial/gathered_photos'
 LOGS_DIR = "logs"
 START = time.time()
 
+voting_size = 14
 DECISIONS = ['mean', 'max', 'min', 'voting']
+DECISION = 'voting'
 
 
 def get_params_from_filename(file_name):
@@ -39,25 +41,47 @@ def generate_images_descriptors(users):
 
 def score_function(parameters, all_features, generate_confusion_matrix=False):
     tolerance = parameters[0]
+    db_size = int(parameters[1])
+
     y_true = []
     y_pred = []
     for user_true in all_features:
-        for index_true in range(len(all_features[user_true])):
+        for index_true in range(len(all_features[user_true]) - db_size):
             faces = Faces(username=user_true, save_faces_funct=lambda x, y: None,
                           get_faces_funct=lambda x: pickle.dumps([all_features[x][index_true]]))
             for user_to_verify in all_features:
-                for index_to_verify in range(index_true+1 if user_true == user_to_verify else 0, len(all_features[user_to_verify])):
+                for index_to_verify in range(index_true + 1 + db_size if user_true == user_to_verify else 0,
+                                             len(all_features[user_to_verify])):
                     scores = faces.verify_user_all_distances(np.array(all_features[user_to_verify][index_to_verify]))
-                    prediction = int(score <= tolerance)
+
+                    if DECISION != 'voting':
+                        score = 1
+                        if DECISION == 'mean':
+                            score = float(scores.mean())
+                        elif DECISION == 'min':
+                            score = float(min(list(scores)))
+                        elif DECISION == 'max':
+                            score = float(max(list(scores)))
+                        prediction = score <= tolerance
+                    else:
+                        min_voters = int(parameters[2])
+                        votes_favor = 0
+                        for score in scores:
+                            if score <= tolerance:
+                                votes_favor += 1
+
+                        prediction = votes_favor >= min_voters
+
                     y_pred.append(1 if user_true == user_to_verify else -1)
-                    y_true.append(prediction if prediction == 1 else -1)
+                    y_true.append(1 if prediction else -1)
 
     mcc = matthews_corrcoef(y_true, y_pred)
     acc = accuracy_score(y_true, y_pred)
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     if generate_confusion_matrix:
         with open(f'{LOGS_DIR}/confusion_matrix_{START}.log', 'a') as f:
-            f.write(f'{tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
+            params = [int(i) for i in parameters[1:]]
+            f.write(f'{DECISION=} {tolerance=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
 
     return (1 - (tp / (tp + fp))*math.sqrt(tp/(tp+fn))) if tp != 0 else 1 # 1 - mcc * (tp / (tp + fp))
 
@@ -105,12 +129,15 @@ def main():
 
     all_features = {k: v for x in results for k, v in x.items()}
 
-    bounds = [(0, 1), tuple(range(len(DECISIONS)))]
+    bounds = [(0, 1), (0, voting_size+1)]
+
+    if DECISION == 'voting':
+        bounds.append((0, voting_size+1))
 
     cb_partial = functools.partial(cb, all_features)
-    optimizer = differential_evolution(func=score_function_2, bounds=bounds,
-                                       args=(all_features, ), workers=mp.cpu_count()-4,
-                                       disp=True, maxiter=250, tol=0, callback=cb_partial)
+    optimizer = differential_evolution(func=score_function, bounds=bounds,
+                                       args=(all_features, ), workers=mp.cpu_count(),
+                                       disp=True, maxiter=500, tol=0, callback=cb_partial)
 
     print(f"Results: {optimizer.x}")
     print(f"Score: {optimizer.fun}")
