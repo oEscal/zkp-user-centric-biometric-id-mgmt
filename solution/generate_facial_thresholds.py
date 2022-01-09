@@ -1,3 +1,4 @@
+from queue import Full
 import sys
 import math
 import pickle
@@ -39,16 +40,23 @@ def generate_images_descriptors(users):
     return all_features
 
 
-def score_function(parameters, all_features, decision, generate_confusion_matrix=False):
+def score_function(parameters, all_features, decision, times, generate_confusion_matrix=False):
     tolerance = parameters[0]
     db_size = int(parameters[1])
+    
+    try:
+        times.put(time.time(), block=False)
+    except Full:
+        pass
+    except Exception:
+        print(f"wawaw: {time.time()}\n\n\n")
 
     y_true = []
     y_pred = []
     for user_true in all_features:
         for index_true in range(len(all_features[user_true]) - db_size):
             faces = Faces(username=user_true, save_faces_funct=lambda x, y: None,
-                          get_faces_funct=lambda x: pickle.dumps([all_features[x][index_true]]))
+                          get_faces_funct=lambda x: pickle.dumps(all_features[x][index_true:index_true+db_size]))
             for user_to_verify in all_features:
                 for index_to_verify in range(index_true + 1 + db_size if user_true == user_to_verify else 0,
                                              len(all_features[user_to_verify])):
@@ -81,15 +89,19 @@ def score_function(parameters, all_features, decision, generate_confusion_matrix
     if generate_confusion_matrix:
         with open(f'{LOGS_DIR}/confusion_matrix_{START}.log', 'a') as f:
             params = [int(i) for i in parameters[1:]]
-            f.write(f'{decision=} {tolerance=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
+            start_time = 0
+            if not times.empty():
+                start_time = times.get()
+            delta = time.time()-start_time
+            f.write(f'{decision=} {tolerance=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=} {delta=}\n')
 
     return (1 - (tp / (tp + fp))*math.sqrt(tp/(tp+fn))) if tp != 0 else 1 # 1 - mcc * (tp / (tp + fp))
 
 
-def cb(all_features, decision, x, convergence):
-    tolerance = x
-    print(f"{tolerance=}")
-    score_function(x, all_features, decision, True)
+def cb(all_features, decision, times, x, convergence):
+    params = x
+    print(f"{params=}")
+    score_function(x, all_features, decision, times, True)
 
 
 def main():
@@ -110,11 +122,14 @@ def main():
 
     if decision == 'voting':
         bounds.append((1, voting_size+1))
+        
+    manager = mp.Manager()
+    times = manager.Queue(1)
 
-    cb_partial = functools.partial(cb, all_features, decision)
+    cb_partial = functools.partial(cb, all_features, decision, times)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
-                                       args=(all_features, decision), workers=mp.cpu_count(),
-                                       disp=True, maxiter=500, tol=0, callback=cb_partial)
+                                       args=(all_features, decision, times), workers=-1,
+                                       disp=True, maxiter=250, tol=0, callback=cb_partial)
 
     print(f"Results: {optimizer.x}")
     print(f"Score: {optimizer.fun}")
