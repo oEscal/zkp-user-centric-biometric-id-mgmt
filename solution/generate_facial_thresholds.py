@@ -1,3 +1,4 @@
+import sys
 import math
 import pickle
 import time
@@ -17,7 +18,6 @@ START = time.time()
 
 voting_size = 14
 DECISIONS = ['mean', 'max', 'min', 'voting']
-DECISION = 'voting'
 
 
 def get_params_from_filename(file_name):
@@ -39,7 +39,7 @@ def generate_images_descriptors(users):
     return all_features
 
 
-def score_function(parameters, all_features, generate_confusion_matrix=False):
+def score_function(parameters, all_features, decision, generate_confusion_matrix=False):
     tolerance = parameters[0]
     db_size = int(parameters[1])
 
@@ -54,13 +54,13 @@ def score_function(parameters, all_features, generate_confusion_matrix=False):
                                              len(all_features[user_to_verify])):
                     scores = faces.verify_user_all_distances(np.array(all_features[user_to_verify][index_to_verify]))
 
-                    if DECISION != 'voting':
+                    if decision != 'voting':
                         score = 1
-                        if DECISION == 'mean':
+                        if decision == 'mean':
                             score = float(scores.mean())
-                        elif DECISION == 'min':
+                        elif decision == 'min':
                             score = float(min(list(scores)))
-                        elif DECISION == 'max':
+                        elif decision == 'max':
                             score = float(max(list(scores)))
                         prediction = score <= tolerance
                     else:
@@ -86,38 +86,15 @@ def score_function(parameters, all_features, generate_confusion_matrix=False):
     return (1 - (tp / (tp + fp))*math.sqrt(tp/(tp+fn))) if tp != 0 else 1 # 1 - mcc * (tp / (tp + fp))
 
 
-def score_function_2(parameters, all_features, generate_confusion_matrix=False):
-    tolerance = parameters[0]
-    y_true = []
-    y_pred = []
-    for user_true in all_features:
-        for index_true in range(len(all_features[user_true]) - 1):
-            faces = Faces(username=user_true, save_faces_funct=lambda x, y: None,
-                          get_faces_funct=lambda x: pickle.dumps([all_features[x][index_true], all_features[x][index_true+1]]))
-            for user_to_verify in all_features:
-                for index_to_verify in range(index_true+1+1 if user_true == user_to_verify else 0, len(all_features[user_to_verify])):
-                    score = faces.verify_user(np.array(all_features[user_to_verify][index_to_verify]))
-                    prediction = int(score <= tolerance)
-                    y_pred.append(1 if user_true == user_to_verify else -1)
-                    y_true.append(prediction if prediction == 1 else -1)
-
-    mcc = matthews_corrcoef(y_true, y_pred)
-    acc = accuracy_score(y_true, y_pred)
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    if generate_confusion_matrix:
-        with open(f'{LOGS_DIR}/confusion_matrix_{START}.log', 'a') as f:
-            f.write(f'{tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=}\n')
-
-    return (1 - (tp / (tp + fp))*math.sqrt(tp/(tp+fn))) if tp != 0 else 1   # 1 - mcc * (tp / (tp + fp))
-
-
-def cb(all_features, x, convergence):
+def cb(all_features, decision, x, convergence):
     tolerance = x
     print(f"{tolerance=}")
-    score_function(x, all_features, True)
+    score_function(x, all_features, decision, True)
 
 
 def main():
+    decision = sys.argv[1]
+
     users = [f for f in os.listdir(DATA_PATH) if os.path.isdir(os.path.join(DATA_PATH, f))]
     print(f"Number of users: {len(users)}")
 
@@ -129,14 +106,14 @@ def main():
 
     all_features = {k: v for x in results for k, v in x.items()}
 
-    bounds = [(0, 1), (0, voting_size+1)]
+    bounds = [(0, 1), (1, voting_size+1)]
 
-    if DECISION == 'voting':
-        bounds.append((0, voting_size+1))
+    if decision == 'voting':
+        bounds.append((1, voting_size+1))
 
-    cb_partial = functools.partial(cb, all_features)
+    cb_partial = functools.partial(cb, all_features, decision)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
-                                       args=(all_features, ), workers=mp.cpu_count(),
+                                       args=(all_features, decision), workers=mp.cpu_count(),
                                        disp=True, maxiter=500, tol=0, callback=cb_partial)
 
     print(f"Results: {optimizer.x}")
