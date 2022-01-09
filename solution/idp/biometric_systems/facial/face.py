@@ -28,6 +28,10 @@ class Faces:
         distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
         return float(distances.mean())
 
+    def verify_user_all_distances(self, face_cmp: np.ndarray) -> np.ndarray:
+        distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
+        return distances
+
     def save_faces(self) -> bool:
         print(self.username)
         return self.save_faces_db(self.username, pickle.dumps(self.pre_defined_faces))
