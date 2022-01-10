@@ -94,15 +94,17 @@ def get_scores(descriptors_terminators, descriptors_bifurcations):
     return score_terminations, score_bifurcations, matches_terminations, matches_bifurcations
 
 
-def is_match(saved_descriptors, actual_descriptor, terminations_threshold, bifurcations_threshold):
+def get_matching_score(saved_descriptors, actual_descriptor, ):
+    scores_terminations, scores_bifurcations = [], []
     for descriptor in saved_descriptors:
         score_terminations, score_bifurcations, _, _ = get_scores(
             (descriptor[0], actual_descriptor[0],),
             (descriptor[1], actual_descriptor[1],)
         )
-        if score_terminations < terminations_threshold and score_bifurcations < bifurcations_threshold:
-            return True
-    return False
+        scores_terminations.append(score_terminations)
+        scores_bifurcations.append(score_bifurcations)
+
+    return scores_terminations, scores_bifurcations
 
 
 def overall_image_quality(img):

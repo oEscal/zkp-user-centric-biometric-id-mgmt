@@ -302,3 +302,5 @@ fingerprints_old/
 *.jpg
 gathered_photos/*
 *.log
+descriptors_database/
+logs_fingerprint/

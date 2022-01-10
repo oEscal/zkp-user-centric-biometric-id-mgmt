@@ -1,0 +1,5 @@
+python3 generate_fingerprint_thresholds.py voting
+python3 generate_fingerprint_thresholds.py min
+python3 generate_fingerprint_thresholds.py mean
+python3 generate_fingerprint_thresholds.py max
+

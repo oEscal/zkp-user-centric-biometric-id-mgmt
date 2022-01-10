@@ -224,7 +224,8 @@ class Fingerprint:
             return None
 
         pool = mp.Pool(processes=self.n_processes)
-        descriptors = [pool.apply(self._descriptors_generation_workflow, args=(img,)) for img in self.img_buffer]
+        descriptors = [pool.apply_async(self._descriptors_generation_workflow, args=(img,)) for img in self.img_buffer]
+        descriptors = [p.get() for p in descriptors]
         pool.close()
         pool.join()
         self.clear_buffer()
