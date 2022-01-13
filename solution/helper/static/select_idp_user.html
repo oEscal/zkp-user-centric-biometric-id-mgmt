@@ -73,26 +73,6 @@
             <div class="line" style="width: 100%"></div>
         </div>
 
-        <form action="/add_idp_user" method="post">
-            <div class="row mb-4 px-3">
-                <h3 class="mb-0 mr-4 mt-2">&bull; Register and login with a new user associated with the Identity
-                    Provider '<a
-                            href="{{idp}}">{{idp}}</a>':
-                </h3>
-            </div>
-
-            <label for="username">Username: </label>
-            <input type="username" id="username" name="username"/>
-
-            <label for="password">Password: </label>
-            <input type="password" id="password" name="password"/>
-
-            <div class="row px-3 mb-4">
-                <input type="submit" value="Register and Login" class="btn btn-blue btn-block text-center"/>
-            </div>
-
-        </form>
-
     </div>
 </div>
 {% endblock %}

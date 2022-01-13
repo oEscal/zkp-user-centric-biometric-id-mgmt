@@ -111,21 +111,36 @@ class HelperApp(object):
             'asy_error_decrypt': "There was an error decrypting the data received from the IdP. A possible cause for "
                                  "this is the IdP we are contacting is not a trusted one!",
         }
-        return self.jinja_env.get_template('error.html').render(message=errors[error_id])
+        return self.__render_page('error.html', message=errors[error_id])
 
     @cherrypy.expose
     def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str):
         self.__init__()
         attrs = id_attrs.split(',')
-        return self.jinja_env.get_template('login_attributes.html').render(sp=sp, idp=idp, id_attrs=attrs,
-                                                                           sso_url=sso_url, consumer_url=consumer_url,
-                                                                           client=client)
+        return self.__render_page('login_attributes.html', sp=sp, idp=idp, id_attrs=attrs,
+                                  sso_url=sso_url, consumer_url=consumer_url,
+                                  client=client)
+
+    def __is_logged_in(self):
+        return bool(self.master_password_manager)
+
+    def __can_add_idp_user(self):
+        return self.__is_logged_in() and len(self.master_password_manager.idps) > 0
+
+    def __render_page(self, page_name, **kwargs):
+        return self.jinja_env.get_template(page_name).render(**kwargs, logout=self.__is_logged_in(),
+                                                             add_idp_user=self.__can_add_idp_user())
+
+    @cherrypy.expose
+    def logout(self):
+        self.master_password_manager = None
+        raise cherrypy.HTTPRedirect('/register', status=303)
 
     @cherrypy.expose
     def authorize_attr_request(self, sp: str, idp: str, id_attrs: list, consumer_url: str, sso_url: str, client: str,
                                **kwargs):
         if 'deny' in kwargs:
-            return self.jinja_env.get_template('auth_refused.html').render()
+            return self.__render_page('auth_refused.html')
         elif 'allow' in kwargs:
             self.sp = sp
             self.idp = idp
@@ -265,15 +280,13 @@ class HelperApp(object):
         # verify master password
         self.master_password_manager = Master_Password_Manager(username=username, master_password=password)
         if not self.master_password_manager.login():
-            return self.jinja_env.get_template('keychain.html').render(action=action,
-                                                                       message='Error: Unsuccessful login!')
+            return self.__render_page('keychain.html', action=action, message='Error: Unsuccessful login!')
 
         if action == 'auth':
-            return self.jinja_env.get_template('select_idp_user.html').render(
-                idp=self.idp,
-                users=self.master_password_manager.get_users_for_idp(self.idp))
+            return self.__render_page('select_idp_user.html', idp=self.idp,
+                                      users=self.master_password_manager.get_users_for_idp(self.idp))
         elif action == 'update':
-            return self.jinja_env.get_template('update.html').render()
+            return self.__render_page('update.html')
         elif action == 'update_idp':
             raise cherrypy.HTTPRedirect("/update_idp_credentials", 301)
         elif action == 'biometric_register':
@@ -304,48 +317,52 @@ class HelperApp(object):
                 self.asymmetric_identification()
 
     @cherrypy.expose
-    def add_idp_user(self, username: str, password: str):
+    def add_idp_user(self, username='', password='', idp='', referer=None):
+        if cherrypy.request.method == 'GET':
+            return self.__render_page('add_idp_user.html', idps=self.master_password_manager.idps)
+
         if cherrypy.request.method != 'POST':
             raise cherrypy.HTTPError(405)
 
-        if not username or not password:
-            return self.jinja_env.get_template("select_idp_user.html").render(
-                idp=self.idp,
-                users=self.master_password_manager.get_users_for_idp(self.idp),
-                message='Error: You must enter a new username with a password!'
-            )
+        if not username or not password or not idp:
+            return self.__render_page("select_idp_user.html", idp=idp,
+                                      users=self.master_password_manager.get_users_for_idp(idp),
+                                      message='Error: You must enter a new username with a password and the IDP!')
 
         # update keychain registered idp users
-        if not self.master_password_manager.add_idp_user(idp_user=username, idp=self.idp):
-            return self.jinja_env.get_template(filename='select_idp_user.html').render(
-                idp=self.idp,
-                users=self.master_password_manager.get_users_for_idp(self.idp),
-                message='Error: Error registering the new user!')
+        if not self.master_password_manager.add_idp_user(idp_user=username, idp=idp):
+            return self.__render_page('select_idp_user.html', idp=idp,
+                                      users=self.master_password_manager.get_users_for_idp(idp),
+                                      message='Error: Error registering the new user!')
 
         master_username = self.master_password_manager.username
         master_password = self.master_password_manager.master_password
         self.password_manager = Password_Manager(master_username=master_username, master_password=master_password,
-                                                 idp_user=username, idp=self.idp)
+                                                 idp_user=username, idp=idp)
 
         self.password_manager.password = password.encode()
+<<<<<<< HEAD
+        if referer:
+            raise cherrypy.HTTPRedirect(referer, status=303)
+=======
 
         # redirect with 30* to the caller page (and delete the zkp_auth)
         self.zkp_auth()
+>>>>>>> master
 
     @cherrypy.expose
     def update_idp_credentials(self, **kwargs):
         # verify if the user is authenticated
         if not self.master_password_manager:
-            return self.jinja_env.get_template('keychain.html').render(action='update_idp')
+            return self.__render_page('keychain.html', action='update_idp')
 
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('update_idp_cred.html').render(
-                idps=self.master_password_manager.idps)
+            return self.__render_page('update_idp_cred.html', idps=self.master_password_manager.idps)
+
         elif cherrypy.request.method == 'POST':
             if 'idp_user' not in kwargs:
-                return self.jinja_env.get_template('update_idp_cred.html').render(
-                    idps=self.master_password_manager.idps,
-                    message="Error: You must select a user to update!")
+                return self.__render_page('update_idp_cred.html', idps=self.master_password_manager.idps,
+                                          message="Error: You must select a user to update!")
 
             indexes = [int(v) for v in kwargs['idp_user'].split('_')]
 
@@ -359,9 +376,9 @@ class HelperApp(object):
             if not message:
                 message = 'Success: The user was updated with success'
 
-            return self.jinja_env.get_template('update_idp_cred.html').render(
-                idps=self.master_password_manager.idps,
-                message=message)
+            return self.__render_page('update_idp_cred.html', idps=self.master_password_manager.idps,
+                                      message=message)
+
         else:
             raise cherrypy.HTTPError(405)
 
@@ -370,14 +387,15 @@ class HelperApp(object):
         idp_user = self.password_manager.idp_username
 
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('update_idp_user.html').render(idp=self.idp, user=idp_user)
+            return self.__render_page('update_idp_user.html', idp=self.idp, user=idp_user)
+
         elif cherrypy.request.method == 'POST':
             message = self.update_idp_user_credentials(idp_user=idp_user, idp=self.idp,
                                                        username=kwargs['username'] if 'username' in kwargs else '',
                                                        password=kwargs['password'] if 'password' in kwargs else '')
             if message:
-                return self.jinja_env.get_template('update_idp_user.html').render(idp=self.idp, user=idp_user,
-                                                                                  message=message)
+                return self.__render_page('update_idp_user.html', idp=self.idp, user=idp_user,
+                                          message=message)
 
             self.zkp_auth(restart=True)
         else:
@@ -411,7 +429,8 @@ class HelperApp(object):
     @cherrypy.expose
     def update(self, **kwargs):
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('keychain.html').render(action='update')
+            return self.__render_page('keychain.html', action='update')
+
         elif cherrypy.request.method == 'POST':
             username = ''
             password = ''
@@ -422,33 +441,34 @@ class HelperApp(object):
 
             prev_username = self.master_password_manager.username
             if not self.master_password_manager.update_user(new_username=username, new_password=password):
-                return self.jinja_env.get_template('update.html').render(message='Error: Error updating the user!')
+                return self.__render_page('update.html', message='Error: Error updating the user!')
 
             # update the key files
             if username:
                 Password_Manager.update_keychain_user(prev_username=prev_username, new_username=username,
                                                       idps=self.master_password_manager.idps)
 
-            return self.jinja_env.get_template('update.html').render(
-                message='Success: The user was updated with success')
+            return self.__render_page('update.html', message='Success: The user was updated with success')
+
         else:
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
     def attribute_presentation(self):
         response_attrs = json.loads(base64.b64decode(self.response_attrs_b64))
-        return self.jinja_env.get_template('attr_presentation.html').render(idp=self.idp, sp=self.sp,
-                                                                            response_attrs=response_attrs)
+        return self.__render_page('attr_presentation.html', idp=self.idp, sp=self.sp,
+                                  response_attrs=response_attrs)
 
     @cherrypy.expose
     def authorize_attr_response(self, **kwargs):
         if 'deny' in kwargs:
-            return self.jinja_env.get_template('auth_refused.html').render()
+            return self.__render_page('auth_refused.html')
+
         elif 'allow' in kwargs:
-            return self.jinja_env.get_template('post_id_attr.html').render(consumer_url=self.consumer_url,
-                                                                           response=self.response_attrs_b64,
-                                                                           signature=self.response_signature_b64,
-                                                                           client=self.sp_client)
+            return self.__render_page('post_id_attr.html', consumer_url=self.consumer_url,
+                                      response=self.response_attrs_b64,
+                                      signature=self.response_signature_b64,
+                                      client=self.sp_client)
 
     @cherrypy.expose
     def zkp(self, password: str):
@@ -477,8 +497,9 @@ class HelperApp(object):
         self.reg_bio = reg_bio
 
         if method in ['face', 'fingerprint']:
-            return self.jinja_env.get_template('biometric_auth.html').render(idp=self.idp, method=method,
-                                                                             operation='verify')
+            return self.__render_page('biometric_auth.html', idp=self.idp, method=method,
+                                      operation='verify')
+
         else:
             self.max_idp_iterations = int(max_iterations)
 
@@ -494,16 +515,15 @@ class HelperApp(object):
 
             # verify if the user is authenticated
             if not self.master_password_manager:
-                return self.jinja_env.get_template('keychain.html').render(action='auth')
+                return self.__render_page('keychain.html', action='auth')
 
             if self.register_biometric:
                 self.zkp_auth()
                 # raise cherrypy.HTTPRedirect(create_get_url("{HELPER_URL}/biometric_face",
                 #                                            params={'username': '', 'operation': 'register'}), 301)
 
-            return self.jinja_env.get_template('select_idp_user.html').render(
-                idp=self.idp,
-                users=self.master_password_manager.get_users_for_idp(self.idp))
+            return self.__render_page('select_idp_user.html', idp=self.idp,
+                                      users=self.master_password_manager.get_users_for_idp(self.idp))
 
     @cherrypy.expose
     def choose_iterations(self, **kwargs):
@@ -511,20 +531,21 @@ class HelperApp(object):
             raise cherrypy.HTTPError(401)
 
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('choose_iterations.html').render(idp=self.idp,
-                                                                                max_iterations=self.max_idp_iterations,
-                                                                                min_iterations=self.min_idp_iterations)
+            return self.__render_page('choose_iterations.html', idp=self.idp,
+                                      max_iterations=self.max_idp_iterations,
+                                      min_iterations=self.min_idp_iterations)
+
         elif cherrypy.request.method == 'POST':
             if 'deny' in kwargs:
-                return self.jinja_env.get_template('auth_refused.html').render()
+                return self.__render_page('auth_refused.html')
+
             elif 'allow' in kwargs:
                 if ('iterations' not in kwargs or not kwargs['iterations']
                         or not kwargs['iterations'].isnumeric() or not int(kwargs['iterations'])):
-                    return self.jinja_env.get_template('choose_iterations.html').render(
-                        idp=self.idp,
-                        max_iterations=self.max_idp_iterations,
-                        min_iterations=self.min_idp_iterations,
-                        message="Error: You must select a number of iterations to use for the authentication!")
+                    return self.__render_page('choose_iterations.html', idp=self.idp,
+                                              max_iterations=self.max_idp_iterations,
+                                              min_iterations=self.min_idp_iterations,
+                                              message="Error: You must select a number of iterations to use for the authentication!")
 
                 self.iterations = int(kwargs['iterations'])
                 # if we want to verify the number of iterations allowed by the IdP a priori
@@ -536,14 +557,16 @@ class HelperApp(object):
                 #         message="Error: You must select a number of iterations belonging to the Identity Provider "
                 #                 "allowed interval, or deny the connection!")
 
-                return self.jinja_env.get_template('keychain.html').render(action='auth')
+                return self.__render_page('keychain.html', action='auth')
+
         else:
             raise cherrypy.HTTPError(405)
 
     @cherrypy.expose
     def register(self, **kwargs):
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('register.html').render()
+            return self.__render_page('register.html')
+
         elif cherrypy.request.method == 'POST':
             username = kwargs['username']
             master_password = kwargs['password'].encode()
@@ -554,10 +577,10 @@ class HelperApp(object):
 
             self.master_password_manager = Master_Password_Manager(username=username, master_password=master_password)
             if not self.master_password_manager.register_user():
-                return self.jinja_env.get_template('register.html').render(
-                    message='Error: The inserted user already exists!')
-            return self.jinja_env.get_template('register.html').render(
-                message='Success: The user was registered with success')
+                return self.__render_page('register.html', message='Error: The inserted user already exists!')
+
+            return self.__render_page('register.html', message='Success: The user was registered with success')
+
         else:
             raise cherrypy.HTTPError(405)
 
@@ -565,20 +588,19 @@ class HelperApp(object):
     def biometric_register(self, **kwargs):
         # verify if the user is authenticated
         if not self.master_password_manager:
-            return self.jinja_env.get_template('keychain.html').render(action='biometric_register')
+            return self.__render_page('keychain.html', action='biometric_register')
 
         if cherrypy.request.method == 'GET':
-            return self.jinja_env.get_template('biometric_register.html').render(
-                idps=self.master_password_manager.idps)
+            return self.__render_page('biometric_register.html', idps=self.master_password_manager.idps)
+
         elif cherrypy.request.method == 'POST':
             if 'idp_user' not in kwargs:
-                return self.jinja_env.get_template('biometric_register.html').render(
-                    idps=self.master_password_manager.idps,
-                    message="Error: You must select a user to update!")
+                return self.__render_page('biometric_register.html', idps=self.master_password_manager.idps,
+                                          message="Error: You must select a user to update!")
+
             elif 'method' not in kwargs:
-                return self.jinja_env.get_template('biometric_register.html').render(
-                    idps=self.master_password_manager.idps,
-                    message="Error: You must select the biometric method you want to register with!")
+                return self.__render_page('biometric_register.html', idps=self.master_password_manager.idps,
+                                          message="Error: You must select the biometric method you want to register with!")
 
             indexes = [int(v) for v in kwargs['idp_user'].split('_')]
 
@@ -620,7 +642,7 @@ class HelperApp(object):
         if 'username' in kwargs:
             data_render['username'] = kwargs['username']
 
-        return self.jinja_env.get_template('face.html').render(**data_render)
+        return self.__render_page('face.html', **data_render)
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -818,7 +840,7 @@ class HelperApp(object):
             'idp': self.idp
         }
 
-        return self.jinja_env.get_template('fingerprint.html').render(**data_render)
+        return self.__render_page('fingerprint.html', **data_render)
 
     def __biometric_registration_final(self):
         if self.registration_method == 'face':
