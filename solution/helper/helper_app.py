@@ -341,15 +341,9 @@ class HelperApp(object):
                                                  idp_user=username, idp=idp)
 
         self.password_manager.password = password.encode()
-<<<<<<< HEAD
         if referer:
             raise cherrypy.HTTPRedirect(referer, status=303)
-=======
-
-        # redirect with 30* to the caller page (and delete the zkp_auth)
-        self.zkp_auth()
->>>>>>> master
-
+    
     @cherrypy.expose
     def update_idp_credentials(self, **kwargs):
         # verify if the user is authenticated
