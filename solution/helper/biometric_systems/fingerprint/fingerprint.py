@@ -41,7 +41,7 @@ upscaler.setModel("fsrcnn", 2)
 
 
 class Fingerprint:
-    def __init__(self, n_img=3, scans_per_image=10, n_processes=5):
+    def __init__(self, n_img=10, scans_per_image=10, n_processes=5):
         self.n_img = n_img
         self.scans_per_image = scans_per_image
         self.uart = None
@@ -115,7 +115,7 @@ class Fingerprint:
                     continue
 
                 self.img_buffer.append(image)
-                with open(f'fingerprints/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
+                with open(f'fingerprints_class/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
                     fp.write(image_binary)
 
                 finger_img += 1
@@ -127,7 +127,7 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.70, quality_threshold=0.75):
+    def valid_image(self, current_image, other_images, difference_threshold=0.60, quality_threshold=0.75):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 

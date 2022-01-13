@@ -148,7 +148,7 @@ def main():
         return
 
     Path(LOGS_DIR).mkdir(parents=True, exist_ok=True)
-    images = os.listdir(DATA_PATH)[:20]
+    images = os.listdir(DATA_PATH)
     descriptors_saved = os.listdir(DESCRIPTORS_DB)
 
     n_process = mp.cpu_count()
