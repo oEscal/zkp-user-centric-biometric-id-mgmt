@@ -25,6 +25,7 @@ class Faces:
         self.pre_defined_faces.append(new_face_features)
 
     def verify_user(self, face_cmp: np.ndarray) -> float:
+        # TODO -> integrate voting
         distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
         return float(distances.mean())
 

@@ -129,7 +129,7 @@ def main():
     cb_partial = functools.partial(cb, all_features, decision, times)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
                                        args=(all_features, decision, times), workers=-1,
-                                       disp=True, maxiter=250, tol=0, callback=cb_partial)
+                                       disp=True, maxiter=250, tol=0.00001, callback=cb_partial)
 
     print(f"Results: {optimizer.x}")
     print(f"Score: {optimizer.fun}")
