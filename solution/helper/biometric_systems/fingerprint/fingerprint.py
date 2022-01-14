@@ -127,7 +127,7 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.60, quality_threshold=0.75):
+    def valid_image(self, current_image, other_images, difference_threshold=0.72, quality_threshold=0.75):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 
