@@ -114,12 +114,20 @@ def overall_image_quality(img):
 
 
 def main():
-    """
-    FSRCNN_x2.pb
-        score_terminations=61.5
-        score_bifurcations=46.65853658536585
-        0.14721989631652832
-    """
+    images = os.listdir('fingerprints')
+    image1 = cv2.imread(f'fingerprints/1_alex_r_3_1641050615.png', 0)
+    image2 = cv2.imread(f'fingerprints/1_alex_r_4_1641050674.png', 0)
+    
+    image1 = enhance_image(image1)
+    image2 = enhance_image(image2)
+
+    res = cv2.absdiff(image1, image2)
+    res = res.astype(np.uint8)
+
+    difference_score = np.count_nonzero(res) / res.size
+    print(difference_score)
+
+    exit()
     sr = cv2.dnn_superres.DnnSuperResImpl_create()
     sr.readModel('FSRCNN_x2.pb')
     sr.setModel("fsrcnn", 2)

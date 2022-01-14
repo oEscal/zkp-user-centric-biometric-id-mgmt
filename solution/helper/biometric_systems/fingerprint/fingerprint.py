@@ -93,7 +93,7 @@ class Fingerprint:
                     else:
                         yield self.create_yield_object("Internal error\n", FINGER_IMAGE_ACQUISITION, False)
 
-                self.create_yield_object("Remove the finger\n", FINGER_IMAGE_ACQUISITION)
+                yield self.create_yield_object("Remove the finger\n", FINGER_IMAGE_ACQUISITION)
 
                 yield self.create_yield_object("\nGenerating image...\n", IMAGE_GENERATION)
 
@@ -127,21 +127,33 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.72, quality_threshold=0.75):
+    def valid_image(self, current_image, other_images, difference_threshold=0.72, quality_threshold=0.65):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 
     def __convert_binary_data_to_image(self, binary_data):
         return cv2.imdecode(np.fromstring(binary_data, np.uint8), cv2.IMREAD_COLOR)
 
+    def __crop_image(self, img):
+        indices = np.argwhere(img == 255)
+        x_list, y_list = [e[1] for e in indices], [e[0] for e in indices]
+
+        min_x, min_y = min(x_list), min(y_list)
+        max_x, max_y = max(x_list), max(y_list)
+
+        x, y, w, h = min_x, min_y, max_x - min_x, max_y - min_y
+
+        cropped_imd = img[y:y + h, x:x + w]
+        return cropped_imd
+
     def __is_different_enough(self, current_image, other_images, difference_threshold):
         for img in other_images:
             res = cv2.absdiff(current_image, img)
             res = res.astype(np.uint8)
 
-            score = np.count_nonzero(res) / res.size
-            print(score)
-            if score < difference_threshold:
+            difference_score = np.count_nonzero(res) / res.size
+            print(f"{difference_score=}")
+            if difference_score < difference_threshold:
                 return False
 
         return True
@@ -149,9 +161,12 @@ class Fingerprint:
     def __is_good_enough(self, img, quality_threshold):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         image = self._enhance_image(img)
+        image = self.__crop_image(image)
         w, h = image.shape
         non_zeros = np.count_nonzero(image == 0)
-        return non_zeros / (w * h) <= quality_threshold
+        quality_score = non_zeros / (w * h)
+        print(f"{quality_score=}")
+        return quality_score <= quality_threshold
 
     def convert_model_data_to_image(self, model_data):
         try:
