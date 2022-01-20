@@ -349,7 +349,7 @@ class HelperApp(object):
         self.password_manager.password = password.encode()
         if referer:
             raise cherrypy.HTTPRedirect(referer, status=303)
-    
+
     @cherrypy.expose
     def update_idp_credentials(self, **kwargs):
         # verify if the user is authenticated

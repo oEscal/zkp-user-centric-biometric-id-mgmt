@@ -117,7 +117,7 @@
                 last_image = image;
             } else if (data.operation === 'valid_image') {
                 $("#fingers_container").show('slow');
-                $("#fingers").prepend($('<img>', {src: `data:image/png;base64,${last_image}`, class: 'col-md-3 py-1'}));
+                $("#fingers").prepend($('<img>', {src: `data:image/png;base64,${last_image}`, class: 'col-md-2 py-1'}));
                 last_image = undefined;
             } else if (data.operation === 'all_images') {
                 $("#current_image_div").hide('slow');
