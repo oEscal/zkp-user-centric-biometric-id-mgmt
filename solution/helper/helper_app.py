@@ -75,6 +75,8 @@ class HelperApp(object):
         self.register_biometric = False
         self.registration_method = ''
 
+        self.message = ""
+
     @staticmethod
     def static_contents(path):
         return open(f"helper/static/{path}", 'r').read()
@@ -114,12 +116,12 @@ class HelperApp(object):
         return self.__render_page('error.html', message=errors[error_id])
 
     @cherrypy.expose
-    def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str):
+    def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str, method: str):
         self.__init__()
         attrs = id_attrs.split(',')
         return self.__render_page('login_attributes.html', sp=sp, idp=idp, id_attrs=attrs,
                                   sso_url=sso_url, consumer_url=consumer_url,
-                                  client=client)
+                                  client=client, method=method)
 
     def __is_logged_in(self):
         return bool(self.master_password_manager)
@@ -138,7 +140,7 @@ class HelperApp(object):
 
     @cherrypy.expose
     def authorize_attr_request(self, sp: str, idp: str, id_attrs: list, consumer_url: str, sso_url: str, client: str,
-                               **kwargs):
+                               method: str, **kwargs):
         if 'deny' in kwargs:
             return self.__render_page('auth_refused.html')
         elif 'allow' in kwargs:
@@ -149,7 +151,7 @@ class HelperApp(object):
             self.sso_url = sso_url
             self.sp_client = client
 
-            raise cherrypy.HTTPRedirect(self.sso_url, status=303)
+            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={'method': method}), status=303)
 
     def asymmetric_identification(self):
         id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
@@ -260,8 +262,12 @@ class HelperApp(object):
             if 'status' in response and bool(response['status']):
                 self.password_manager.save_private_key(user_id=response['user_id'], time_to_live=float(response['ttl']))
         else:
-            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
-                                                       params={'error_id': 'zkp_auth_error'}), 301)
+            self.message = "There was an error on ZKP authentication. This could mean that or the introduced " \
+                           "password or username are incorrect, or the IdP we are contacting is not a trusted one!" \
+                           "<br>" \
+                           "You can access the page '<a href=\"/update_idp_user\">/update_idp_user</a>' to update " \
+                           "this user's credentials."
+            raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
 
         # if the authentication is done for the registration with biometrics, redirect
         if self.register_biometric:
@@ -449,9 +455,13 @@ class HelperApp(object):
 
     @cherrypy.expose
     def attribute_presentation(self):
-        response_attrs = json.loads(base64.b64decode(self.response_attrs_b64))
+        response_attrs = {}
+        if self.response_attrs_b64:
+            response_attrs = json.loads(base64.b64decode(self.response_attrs_b64))
         return self.__render_page('attr_presentation.html', idp=self.idp, sp=self.sp,
-                                  response_attrs=response_attrs)
+                                  response_attrs=response_attrs,
+                                  message=f"The IdP could not authenticate with success! <br> {self.message}"
+                                  if not response_attrs else "")
 
     @cherrypy.expose
     def authorize_attr_response(self, **kwargs):
@@ -653,7 +663,7 @@ class HelperApp(object):
         if operation == 'verify':
             if 'username' not in kwargs:
                 cherrypy.response.status = 500
-                return {'message': "The IdP was no able to login with face"}
+                return {'message': "The IdP was not able to login with face"}
 
             features = self.face_biometry.get_facial_features(number_faces=1)
             while True:
@@ -681,7 +691,8 @@ class HelperApp(object):
                 print(f"Error status: {response.status_code}")
                 # self.zkp_auth()
                 cherrypy.response.status = 500
-                return {'message': "The IdP was no able to login with face"}
+                self.message = "The IdP was not able to login with face"
+                # return {'message': "The IdP was not able to login with face"}
             else:
                 response_dict = self.cipher_auth.decipher_response(response.json())
                 self.response_attrs_b64 = response_dict['response']
@@ -793,7 +804,8 @@ class HelperApp(object):
 
             if response.status_code != 200:
                 cherrypy.response.status = 500
-                return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
+                self.message = FINGERPRINT_ERRORS.get("LOGIN_ERROR")
+                # return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
 
             response_dict = self.cipher_auth.decipher_response(response.json())
             self.response_attrs_b64 = response_dict['response']

@@ -10,7 +10,7 @@ import cherrypy
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
-from mako.template import Template
+from jinja2 import Environment, FileSystemLoader
 
 from utils.utils import create_directory, create_get_url, asymmetric_padding_signature, asymmetric_hash
 
@@ -33,23 +33,48 @@ HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
 clients_auth: typing.Dict[str, dict] = dict()
 clients_idp: typing.Dict[str, str] = dict()
 
+AUTH_METHODS = {
+    'face': 'Face',
+    'fingerprint': 'Fingerprint',
+    'zkp': 'Zero Knowledge Proof (ZKP)'
+}
+
 
 # noinspection HttpUrlsUsage
 class SP(object):
+    def __init__(self):
+        self.jinja_env = Environment(loader=FileSystemLoader('sp/static'))
+        self.remaining_methods = []
+        self.minimum_methods = 0
+
+    def __render_page(self, page_name, **kwargs):
+        return self.jinja_env.get_template(page_name).render(**kwargs)
+
+    def __redirect_to_helper(self, method):
+        __client_id = str(uuid.uuid4())
+        clients_auth[__client_id] = dict()
+
+        self.set_cookie('client_id', __client_id)
+
+        '''Note that if you want to other IdPs you must change this piece of code to send other possible IdPs'''
+        clients_idp[__client_id] = IDP_URL
+        raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/login",
+                                                   params={
+                                                       'sp': HOST_URL,
+                                                       'idp': IDP_URL,
+                                                       'id_attrs': ','.join(['username']),
+                                                       'consumer_url': f"{HOST_URL}/identity",
+                                                       'sso_url': f"{IDP_URL}/login",
+                                                       'client': __client_id,
+                                                       'method': method
+                                                   }), 303)
+
     @staticmethod
     def random_name() -> str:
         """Creates a random name just for temporarility storing an uploded file
         :return:
         """
         return base64.urlsafe_b64encode(os.urandom(15)).decode('utf8')
-
-    @staticmethod
-    def static_page(path: str):
-        """Reads a static HTML page
-        :param path:
-        :return:
-        """
-        return open(f"sp/static/{path}", 'r').read()
 
     @staticmethod
     def set_cookie(name: str, value: str):
@@ -109,36 +134,18 @@ class SP(object):
         :return:
         """
 
-        def redirect_to_helper():
-            __client_id = str(uuid.uuid4())
-            clients_auth[__client_id] = dict()
-
-            self.set_cookie('client_id', __client_id)
-
-            '''Note that if you want to other IdPs you must change this piece of code to send other possible IdPs'''
-            clients_idp[__client_id] = IDP_URL
-            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/login",
-                                                       params={
-                                                           'sp': HOST_URL,
-                                                           'idp': IDP_URL,
-                                                           'id_attrs': ','.join(['username']),
-                                                           'consumer_url': f"{HOST_URL}/identity",
-                                                           'sso_url': f"{IDP_URL}/login",
-                                                           'client': __client_id
-                                                       }), 307)
-
         cookies = cherrypy.request.cookie
         # if not cookies:
         if 'client_id' not in cookies:
             if redirect:
-                redirect_to_helper()
+                raise cherrypy.HTTPRedirect('/auth_methods', status=307)
             else:
                 return False
 
         client_id = cookies['client_id'].value
         if client_id not in clients_auth or not clients_auth[client_id]:
             if redirect:
-                redirect_to_helper()
+                raise cherrypy.HTTPRedirect('/auth_methods', status=307)
             else:
                 return False
 
@@ -159,11 +166,40 @@ class SP(object):
         raise cherrypy.HTTPRedirect('/account', status=307)
 
     @cherrypy.expose
+    def auth_methods(self, **kwargs):
+        if cherrypy.request.method == 'GET':
+            return self.__render_page('index_auth.html', methods=AUTH_METHODS)
+        elif cherrypy.request.method == 'POST':
+            if 'methods' not in kwargs:
+                return self.__render_page('index_auth.html', methods=AUTH_METHODS,
+                                          message="Error: You must select at least one method!")
+            elif 'minimum' not in kwargs:
+                return self.__render_page('index_auth.html', methods=AUTH_METHODS,
+                                          message="Error: You must select the number of biometric methods to consider!")
+
+            # verifications
+            for method in kwargs['methods']:
+                if method not in AUTH_METHODS:
+                    self.__render_page('index_auth.html', methods=AUTH_METHODS,
+                                       message="Error: You must select a valid method!")
+
+            if not kwargs['minimum'].isnumeric() or int(kwargs['minimum']) > len(AUTH_METHODS):
+                self.__render_page('index_auth.html', methods=AUTH_METHODS,
+                                   message="You must select a valid minimum of methods!")
+
+            self.remaining_methods = kwargs['methods'][1:]
+            self.minimum_methods = int(kwargs['minimum'])
+
+            self.__redirect_to_helper(method=kwargs['methods'][0])
+        else:
+            raise cherrypy.HTTPError(405)
+
+    @cherrypy.expose
     def login(self) -> str:
         """Login page, which performs a (visible) HTML redirection
         :return:
         """
-        return self.static_page('login.html')
+        return self.__render_page('login.html')
 
     @cherrypy.expose
     def identity(self, response, signature, client):
@@ -193,11 +229,13 @@ class SP(object):
                 return
 
             attributes = json.loads(base64.urlsafe_b64decode(response))
+            print(f"attributes: {attributes}")
 
             cookies = cherrypy.request.cookie
             request_id = cookies['client_id'].value
             clients_auth[request_id] = attributes
-        return Template(filename='static/redirect_index.html').render()
+
+        return self.__render_page('static/redirect_index.html')
 
     @cherrypy.expose
     def account(self) -> str:
@@ -226,7 +264,7 @@ class SP(object):
         name = self.random_name()
         account = self.get_account(False)
         if not account:
-            return self.static_page('login.html')
+            return self.__render_page('login.html')
 
         path = Path(f"{os.getcwd()}/accounts/{account}/{name}")
         m = hashlib.sha1()
