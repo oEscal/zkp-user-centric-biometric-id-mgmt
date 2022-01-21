@@ -237,7 +237,7 @@ class SP(object):
             request_id = cookies['client_id'].value
             clients_auth[request_id] = attributes
 
-        return self.__render_page('static/redirect_index.html')
+        return self.__render_page('redirect_index.html')
 
     @cherrypy.expose
     def account(self) -> str:

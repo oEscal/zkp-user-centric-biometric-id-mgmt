@@ -19,8 +19,5 @@ class Face_biometry:
 			return True
 		return False
 
-	def verify_user(self, face_features: list[float], tolerance=0.45) -> bool:
-		all_verifications = self.faces.verify_user(np.array(face_features))
-		print(f"Distance: {all_verifications}")
-
-		return all_verifications <= tolerance
+	def verify_user(self, face_features: list[float]) -> bool:
+		return self.faces.verify_user(np.array(face_features))
