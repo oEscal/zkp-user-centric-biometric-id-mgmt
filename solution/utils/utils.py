@@ -96,6 +96,7 @@ class ZKP_IdP(ZKP, Cipher_Authentication):
 		self.max_iterations = max_iterations
 
 	def next_method(self) -> str:
+		print(self.methods)
 		self.current_method = self.methods.pop()
 		return self.current_method
 

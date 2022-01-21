@@ -356,13 +356,8 @@ class IdP(Asymmetric_IdP):
         else:
             current_zkp.methods_unsuccessful.add(method)
 
+        print(current_zkp.methods_successful)
         if len(current_zkp.methods_successful) >= current_zkp.minimum_methods:
-            return current_zkp.create_response({
-                'redirect': True,
-                'status_code': 303,
-                'url': self.__redirect_helper_authentication(client_id=client_id)
-            })
-        elif auth_success:
             id_attrs_b64 = request_args['id_attrs'].encode()
             response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64=id_attrs_b64, username=username)
             return current_zkp.create_response({
@@ -373,13 +368,20 @@ class IdP(Asymmetric_IdP):
                 'methods_successful': list(current_zkp.methods_successful),
             })
         else:
-            cherrypy.response.status = 401
-            return current_zkp.create_response({
-                'redirect': False,
-                'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
-                'methods_successful': list(current_zkp.methods_successful),
-                'message': 'Authentication failed'
-            })
+            try:
+                return current_zkp.create_response({
+                    'redirect': True,
+                    'status_code': 303,
+                    'url': self.__redirect_helper_authentication(client_id=client_id)
+                })
+            except IndexError:
+                cherrypy.response.status = 401
+                return current_zkp.create_response({
+                    'redirect': False,
+                    'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
+                    'methods_successful': list(current_zkp.methods_successful),
+                    'message': 'Authentication failed'
+                })
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

@@ -179,7 +179,7 @@ class SP(object):
                                           message="Error: You must select the number of biometric methods to consider!")
 
             if type(kwargs['methods']) is str:
-                kwargs['methods'] = list(kwargs['methods'])
+                kwargs['methods'] = [kwargs['methods']]
 
             # verifications
             for method in kwargs['methods']:
