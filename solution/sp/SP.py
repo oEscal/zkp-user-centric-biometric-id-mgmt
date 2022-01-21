@@ -178,6 +178,9 @@ class SP(object):
                 return self.__render_page('index_auth.html', methods=AUTH_METHODS,
                                           message="Error: You must select the number of biometric methods to consider!")
 
+            if type(kwargs['methods']) is str:
+                kwargs['methods'] = list(kwargs['methods'])
+
             # verifications
             for method in kwargs['methods']:
                 if method not in AUTH_METHODS:

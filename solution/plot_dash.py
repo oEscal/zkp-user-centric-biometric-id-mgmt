@@ -89,7 +89,7 @@ def main(logs_path):
                   Input('plot_list', 'value'))
     def update_graphics(value):
         label = value.split('/')[1]
-        if label == 'fingerprint':
+        if label == 'fingerprint' or label == 'facial':
             current_data = [p.get('score', 0) for p in get_data(value)] if value is not None else []
             return create_score_evolution_figure(current_data)
         elif label == 'upscaling_time':
