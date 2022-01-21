@@ -50,7 +50,7 @@ class SP(object):
     def __render_page(self, page_name, **kwargs):
         return self.jinja_env.get_template(page_name).render(**kwargs)
 
-    def __redirect_to_helper(self, method):
+    def __redirect_to_helper(self, methods, minimum_methods):
         __client_id = str(uuid.uuid4())
         clients_auth[__client_id] = dict()
 
@@ -66,7 +66,8 @@ class SP(object):
                                                        'consumer_url': f"{HOST_URL}/identity",
                                                        'sso_url': f"{IDP_URL}/login",
                                                        'client': __client_id,
-                                                       'method': method
+                                                       'methods': methods,
+                                                       'minimum_methods': minimum_methods,
                                                    }), 303)
 
     @staticmethod
@@ -190,7 +191,8 @@ class SP(object):
             self.remaining_methods = kwargs['methods'][1:]
             self.minimum_methods = int(kwargs['minimum'])
 
-            self.__redirect_to_helper(method=kwargs['methods'][0])
+            self.__redirect_to_helper(methods=base64.urlsafe_b64encode(json.dumps(kwargs['methods']).encode()),
+                                      minimum_methods=int(kwargs['minimum']))
         else:
             raise cherrypy.HTTPError(405)
 
@@ -215,7 +217,7 @@ class SP(object):
             try:
                 # read from the file where is stored the used IdP (the file name will be the base64 of the IdP's URL)
                 file_name = base64.urlsafe_b64encode(clients_idp[client].encode()).decode()
-                with open(f'idps_certificates/{file_name}.crt', 'rb') as file:
+                with open(f'sp/idps_certificates/{file_name}.crt', 'rb') as file:
                     cert_data = file.read()
                 cert = x509.load_pem_x509_certificate(data=cert_data, backend=default_backend())
                 cert.public_key().verify(signature=signature, data=response.encode(),
