@@ -113,61 +113,32 @@ def overall_image_quality(img):
     return non_zeros / (w * h)
 
 
+def crop_image(img):
+    indices = np.argwhere(img == 255)
+    x_list, y_list = [e[1] for e in indices], [e[0] for e in indices]
+
+    min_x, min_y = min(x_list), min(y_list)
+    max_x, max_y = max(x_list), max(y_list)
+
+    x, y, w, h = min_x, min_y, max_x - min_x, max_y - min_y
+
+    cropped_imd = img[y:y + h, x:x + w]
+    return cropped_imd
+
+
 def main():
-    images = os.listdir('fingerprints')
-    image1 = cv2.imread(f'fingerprints/1_alex_r_3_1641050615.png', 0)
-    image2 = cv2.imread(f'fingerprints/1_alex_r_4_1641050674.png', 0)
-    
+    images = os.listdir('fingerprints_database/fingerprints')
+    image1 = cv2.imread(f'fingerprints_database/fingerprints_old/1_rafael_l_5_1640623577.png', 0)
+    image2 = cv2.imread(f'fingerprints_database/fingerprints_class/6_rafael_l_2_1642092246.png', 0)
+
+    cv2.imwrite('image1.png', image1)
+    cv2.imwrite('image2.png', image2)
+
     image1 = enhance_image(image1)
     image2 = enhance_image(image2)
 
-    res = cv2.absdiff(image1, image2)
-    res = res.astype(np.uint8)
-
-    difference_score = np.count_nonzero(res) / res.size
-    print(difference_score)
-
-    exit()
-    sr = cv2.dnn_superres.DnnSuperResImpl_create()
-    sr.readModel('FSRCNN_x2.pb')
-    sr.setModel("fsrcnn", 2)
-
-    images = os.listdir('fingerprints')
-    img1 = images[0]
-    img2 = images[1]
-
-    print(img1)
-    img1 = cv2.imread(f'fingerprints/{img1}', 0)
-    img1 = enhance_image(img1)
-    print(overall_image_quality(img1))
-    exit()
-    img2 = cv2.imread(f'fingerprints/{img2}', 1)
-
-    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-    img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-
-    out1 = enhance_image(img1)
-    out2 = enhance_image(img2)
-
-    features_terminations1, features_bifurcations1 = extract_features(out1)
-    features_terminations2, features_bifurcations2 = extract_features(out2)
-
-    kp_terminations1, kp_bifurcations1 = get_key_points(features_terminations1, features_bifurcations1)
-    kp_terminations2, kp_bifurcations2 = get_key_points(features_terminations2, features_bifurcations2)
-
-    desc_terminations1, desc_bifurcations1 = generate_descriptors(out1, kp_terminations1, kp_bifurcations1)
-    desc_terminations2, desc_bifurcations2 = generate_descriptors(out2, kp_terminations2, kp_bifurcations2)
-
-    score_terminations, score_bifurcations, matches_terminations, matches_bifurcations = get_scores(
-        (desc_terminations1, desc_terminations2,),
-        (desc_bifurcations1, desc_bifurcations2,)
-    )
-
-    print(f'{score_terminations=}')
-    print(f'{score_bifurcations=}')
-
-    # plot_data(out1, out2, (kp_terminations1, kp_bifurcations1,), (kp_terminations2, kp_bifurcations2,),
-    #           matches_terminations, matches_bifurcations)
+    cv2.imwrite('image1_crop.png', crop_image(image1))
+    cv2.imwrite('image2_crop.png', crop_image(image2))
 
 
 if __name__ == '__main__':
