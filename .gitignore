@@ -305,3 +305,4 @@ gathered_photos/*
 descriptors_database/
 logs_fingerprint/
 fingerprints_class/
+fingerprints_database/
