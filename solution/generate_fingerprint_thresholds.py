@@ -1,8 +1,8 @@
 import json
 import random
-import sys
 import time
 import math
+import argparse
 from pathlib import Path
 from scipy.optimize import differential_evolution
 from sklearn.metrics import matthews_corrcoef, confusion_matrix, accuracy_score
@@ -15,10 +15,9 @@ import statistics
 import functools
 import pickle
 
-DATA_PATH = 'fingerprints_upscaled'
-LOGS_DIR = "logs_fingerprint"
+LOGS_DIR = "logs/fingerprint"
 DESCRIPTORS_DB = 'descriptors_database'
-voting_size = 5
+voting_size = 10
 START = time.time()
 
 
@@ -41,15 +40,32 @@ DECISIONS = {
 }
 
 
+def save_scores_per_iteration(decision, name, data):
+    def np_encoder(object):
+        if isinstance(object, np.generic):
+            return object.item()
+
+    file_path = f'{LOGS_DIR}/scores_{name}_{START}_{decision}.json'
+    if not os.path.isfile(file_path):
+        with open(file_path, 'w') as f:
+            json.dump([], f)
+
+    with open(file_path, 'r') as f:
+        content = json.load(f) + [data]
+
+    with open(file_path, 'w') as f:
+        json.dump(content, f, default=np_encoder)
+
+
 def get_params_from_filename(file_name):
     image_index, name, side, finger_id, acquisition_time = file_name.split('_')
     return int(image_index), name, side, int(finger_id), int(acquisition_time.split('.')[0])
 
 
-def generate_images_descriptors(images, descriptors_saved):
+def generate_images_descriptors(images, data_path, descriptors_saved):
     descriptors = {}
     for img in images:
-        full_path = f'{DATA_PATH}/{img}'
+        full_path = f'{data_path}/{img}'
         descriptor_filename = full_path.replace('/', '_').split('.')[0]
 
         if descriptor_filename not in descriptors_saved:
@@ -70,7 +86,7 @@ def generate_images_descriptors(images, descriptors_saved):
     return descriptors
 
 
-def score_function(parameters, descriptors, descriptors_grouped_by_name, decision, times,
+def score_function(parameters, descriptors, descriptors_grouped_by_name, decision, times, name,
                    generate_confusion_matrix=False):
     voting_size_terminations, voting_size_bifurcations = 0, 0
     if len(parameters) == 3:
@@ -124,38 +140,49 @@ def score_function(parameters, descriptors, descriptors_grouped_by_name, decisio
     acc = accuracy_score(y_true, y_pred)
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     if generate_confusion_matrix:
-        with open(f'{LOGS_DIR}/confusion_matrix_{START}_{decision}.log', 'a') as f:
-            params = [int(i) for i in parameters[2:]]
-            start_time = 0
-            if not times.empty():
-                start_time = times.get()
-            delta = time.time() - start_time
-            f.write(
-                f'{decision=} {terminations_threshold=} { bifurcations_threshold=} {params=} {tn=} {fp=} {fn=} {tp=} {mcc=} {acc=} {(tp / (tp + fp))*math.sqrt(tp/(tp+fn))=} {delta=}\n')
+        params = [int(i) for i in parameters[2:]]
+        start_time = 0
+        if not times.empty():
+            start_time = times.get()
+        delta = time.time() - start_time
 
-    return (1 - (tp / (tp + fp)) * math.sqrt(tp / (tp + fn))) if tp != 0 else 1  # 1 - mcc * (tp / (tp + fp))
+        data = {
+            'decision': decision,
+            'terminations_threshold': terminations_threshold,
+            'bifurcations_threshold': bifurcations_threshold,
+            'params': params,
+            'tn': tn,
+            'fp': fp,
+            'fn': fn,
+            'tp': tp,
+            'mcc': mcc,
+            'acc': acc,
+            'score': (tp / (tp + fp)) * math.sqrt(tp / (tp + fn)),
+            'delta': delta
+
+        }
+        save_scores_per_iteration(decision, name, data)
+
+    return (1 - (tp / (tp + fp)) * math.sqrt(tp / (tp + fn))) if tp != 0 else 1
 
 
-def cb(descriptors, descriptors_grouped_by_name, decision, times, x, convergence):
+def cb(descriptors, descriptors_grouped_by_name, decision, times, name, x, convergence):
     print(f"{x=}")
-    score_function(x, descriptors, descriptors_grouped_by_name, decision, times, True)
+    score_function(x, descriptors, descriptors_grouped_by_name, decision, times, name, True)
 
 
-def main():
-    decision = sys.argv[1]
-    if decision not in DECISIONS:
-        print("Invalid decision option")
-        return
+def main(args):
+    decision, name, data_path = args.decision, args.name, args.input
 
     Path(LOGS_DIR).mkdir(parents=True, exist_ok=True)
-    images = os.listdir(DATA_PATH)
+    images = os.listdir(data_path)[:10]
     descriptors_saved = os.listdir(DESCRIPTORS_DB)
 
     n_process = mp.cpu_count()
     pool = mp.Pool(processes=n_process)
 
-    results = [pool.apply_async(generate_images_descriptors, args=(sub_images, descriptors_saved,)) for sub_images in
-               np.array_split(images, n_process)]
+    results = [pool.apply_async(generate_images_descriptors, args=(sub_images, data_path, descriptors_saved,))
+               for sub_images in np.array_split(images, n_process)]
     results = [p.get() for p in results]
     descriptors = {k: v for x in results for k, v in x.items()}
     descriptors_grouped_by_name = {}
@@ -175,13 +202,13 @@ def main():
     manager = mp.Manager()
     times = manager.Queue(1)
 
-    cb_partial = functools.partial(cb, descriptors, descriptors_grouped_by_name, decision, times)
+    cb_partial = functools.partial(cb, descriptors, descriptors_grouped_by_name, decision, times, name)
     optimizer = differential_evolution(func=score_function, bounds=bounds,
-                                       args=(descriptors, descriptors_grouped_by_name, decision, times),
+                                       args=(descriptors, descriptors_grouped_by_name, decision, times, name),
                                        workers=n_process,
                                        disp=True, maxiter=100, tol=0.001, callback=cb_partial)
 
-    with open(f'{LOGS_DIR}/thresholds_{START}_{decision}.json', 'w') as fp:
+    with open(f'{LOGS_DIR}/thresholds_{name}_{START}_{decision}.json', 'w') as fp:
         json.dump({
             'x': optimizer.x.tolist(),
             'fun': optimizer.fun.tolist()
@@ -189,4 +216,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(
+        description='Optimization algorithm to find the needed parameters in fingerprint authentication')
+    parser.add_argument('--decision', '-d', type=str, default='min', help="Decision process",
+                        choices=list(DECISIONS.keys()))
+    parser.add_argument('--name', '-n', type=str, required=True, help='Execution name')
+    parser.add_argument('--input', '-i', type=str, default='fingerprints_database/fingerprints_upscaled',
+                        help="Fingeprint' images path")
+    main(parser.parse_args())

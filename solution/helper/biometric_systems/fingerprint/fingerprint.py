@@ -29,12 +29,6 @@ SIMILAR_IMAGE = 7
 VALID_IMAGE = 8
 ALL_IMAGES_VALID = 9
 
-# IMAGE_DIFFERENCE = 6
-# # descriptors
-# DESCRIPTORS_GENERATION = 7
-# DESCRIPTORS_DATA = 8
-
-
 upscaler = cv2.dnn_superres.DnnSuperResImpl_create()
 upscaler.readModel('FSRCNN_x2.pb')
 upscaler.setModel("fsrcnn", 2)
