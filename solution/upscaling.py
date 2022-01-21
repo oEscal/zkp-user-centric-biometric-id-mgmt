@@ -27,9 +27,9 @@ def upscaler(images, model, original_folder_name, upscaled_folder_name, times):
 
 
 def main():
-    models_names = [i for i in os.listdir() if i.endswith('.pb')][1:]
+    models_names = [i for i in os.listdir() if i.endswith('.pb')]
     original_folder_name = 'fingerprints_database/fingerprints_class'
-    original_images = os.listdir(original_folder_name)[:8]
+    original_images = os.listdir(original_folder_name)
     n_process = mp.cpu_count()
     splitted_images = np.array_split(original_images, n_process)
 

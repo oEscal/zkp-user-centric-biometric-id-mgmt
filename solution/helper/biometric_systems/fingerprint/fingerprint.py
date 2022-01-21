@@ -109,8 +109,8 @@ class Fingerprint:
                     continue
 
                 self.img_buffer.append(image)
-                with open(f'fingerprints_class/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
-                    fp.write(image_binary)
+                # with open(f'fingerprints_class/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
+                #     fp.write(image_binary)
 
                 finger_img += 1
                 yield self.create_yield_object("\nValid image\n", VALID_IMAGE)

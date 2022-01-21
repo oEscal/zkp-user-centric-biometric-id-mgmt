@@ -175,7 +175,7 @@ def main(args):
     decision, name, data_path = args.decision, args.name, args.input
 
     Path(LOGS_DIR).mkdir(parents=True, exist_ok=True)
-    images = os.listdir(data_path)[:10]
+    images = os.listdir(data_path)
     descriptors_saved = os.listdir(DESCRIPTORS_DB)
 
     n_process = mp.cpu_count()
