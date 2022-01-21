@@ -5,6 +5,10 @@ import numpy as np
 import pickle
 
 
+MIN_VOTERS = 2
+TOLERANCE = 0.53
+
+
 def get_features_from_face(frame: np.ndarray, face_locations: list[list]) -> list[float]:
     return face_recognition.face_encodings(frame, known_face_locations=face_locations, model='large')[0].tolist()
 
@@ -24,10 +28,13 @@ class Faces:
     def add(self, new_face_features: list[float]):
         self.pre_defined_faces.append(new_face_features)
 
-    def verify_user(self, face_cmp: np.ndarray) -> float:
-        # TODO -> integrate voting
-        distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
-        return float(distances.mean())
+    def verify_user(self, face_cmp: np.ndarray) -> bool:
+        scores: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)
+        votes_favor = 0
+        for score in scores:
+            if score <= TOLERANCE:
+                votes_favor += 1
+        return votes_favor >= MIN_VOTERS
 
     def verify_user_all_distances(self, face_cmp: np.ndarray) -> np.ndarray:
         distances: np.ndarray = face_recognition.face_distance(self.pre_defined_faces, face_cmp)

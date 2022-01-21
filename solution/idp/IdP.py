@@ -58,6 +58,21 @@ class IdP(Asymmetric_IdP):
         super().__init__()
         self.jinja_env = Environment(loader=FileSystemLoader('idp/static'))
 
+    def __redirect_helper_authentication(self, client_id: str):
+        return create_get_url(f"{HELPER_URL}/authenticate",
+                                                   params={
+                                                       'max_iterations': MAX_ITERATIONS_ALLOWED,
+                                                       'min_iterations': MIN_ITERATIONS_ALLOWED,
+                                                       'client': client_id,
+                                                       'method': zkp_values[client_id].next_method(),
+                                                       'key': base64.urlsafe_b64encode(zkp_values[client_id].key),
+                                                       'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
+                                                       'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
+                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}",
+                                                       'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}",
+                                                       'reg_bio': f"{HOST_URL}/{self.biometric_register.__name__}",
+                                                   })
+
     @cherrypy.expose
     def index(self):
         user_id = cherrypy.session.get('user_id')
@@ -91,25 +106,14 @@ class IdP(Asymmetric_IdP):
         return template.render(id=user.get('id'), username=user.get('username'))
 
     @cherrypy.expose
-    def login(self, method='face'):
+    def login(self, methods, minimum_methods='1'):
         client_id = str(uuid.uuid4())
 
         aes_key = urandom(32)
         # TODO -> MUDAR ISTO
-        zkp_values[client_id] = ZKP_IdP(method=method, key=aes_key, max_iterations=MAX_ITERATIONS_ALLOWED)
-        raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/authenticate",
-                                                   params={
-                                                       'max_iterations': MAX_ITERATIONS_ALLOWED,
-                                                       'min_iterations': MIN_ITERATIONS_ALLOWED,
-                                                       'client': client_id,
-                                                       'method': method,
-                                                       'key': base64.urlsafe_b64encode(aes_key),
-                                                       'auth_url': f"{HOST_URL}/{self.authenticate.__name__}",
-                                                       'save_pk_url': f"{HOST_URL}/{self.save_asymmetric.__name__}",
-                                                       'id_url': f"{HOST_URL}/{self.identification.__name__}",
-                                                       'auth_bio': f"{HOST_URL}/{self.biometric_authentication.__name__}",
-                                                       'reg_bio': f"{HOST_URL}/{self.biometric_register.__name__}",
-                                                   }), 307)
+        zkp_values[client_id] = ZKP_IdP(methods=methods, minimum_methods=int(minimum_methods), key=aes_key,
+                                        max_iterations=MAX_ITERATIONS_ALLOWED)
+        raise cherrypy.HTTPRedirect(self.__redirect_helper_authentication(client_id=client_id), 303)
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -180,10 +184,13 @@ class IdP(Asymmetric_IdP):
         current_zkp = zkp_values[client_id]
         request_args = current_zkp.decipher_response(kwargs)
 
+        method = current_zkp.current_method
+
         # restart zkp
         if 'restart' in request_args and request_args['restart']:
-            zkp_values[client_id] = ZKP_IdP(method=current_zkp.method, key=current_zkp.key,
+            zkp_values[client_id] = ZKP_IdP(methods=method, key=current_zkp.key,
                                             max_iterations=MAX_ITERATIONS_ALLOWED)
+            zkp_values[client_id].current_method = method
             current_zkp = zkp_values[client_id]
 
         challenge = request_args['nonce'].encode()
@@ -254,6 +261,22 @@ class IdP(Asymmetric_IdP):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def identification(self, **kwargs):
+        def __redirect_or_end(current_zkp: ZKP_IdP):
+            try:
+                return current_zkp.create_response({
+                    'redirect': True,
+                    'status_code': 303,
+                    'url': self.__redirect_helper_authentication(client_id=client_id)
+                })
+            except IndexError:
+                cherrypy.response.status = 401
+                return current_zkp.create_response({
+                    'redirect': False,
+                    'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
+                    'methods_successful': list(current_zkp.methods_successful),
+                    'message': 'Authentication failed'
+                })
+
         client_id = kwargs['client']
         current_zkp = zkp_values[client_id]
         request_args = current_zkp.decipher_response(kwargs)
@@ -273,8 +296,9 @@ class IdP(Asymmetric_IdP):
                     public_key.verify(signature=id_attrs_signature_b64, data=id_attrs_b64,
                                       padding=asymmetric_padding_signature(), algorithm=asymmetric_hash())
                 except InvalidSignature:
-                    del current_zkp
-                    raise cherrypy.HTTPError(401, message="Authentication failed")
+                    current_zkp.methods_unsuccessful.add('zkp')
+                    __redirect_or_end(current_zkp)
+                    # raise cherrypy.HTTPError(401, message="Authentication failed")
 
                 response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64, username)
 
@@ -289,11 +313,18 @@ class IdP(Asymmetric_IdP):
                     'signature': response_signature_b64.decode()
                 }, iv=iv)
 
-                return current_zkp.create_response({
-                    'ciphered_aes_key': ciphered_aes_key.decode(),
-                    'iv': base64.urlsafe_b64encode(iv).decode(),
-                    'response': response
-                })
+                current_zkp.methods_successful.add('zkp')
+                if len(current_zkp.methods_successful) >= current_zkp.minimum_methods:
+                    return current_zkp.create_response({
+                        'redirect': False,
+                        'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
+                        'methods_successful': list(current_zkp.methods_successful),
+                        'ciphered_aes_key': ciphered_aes_key.decode(),
+                        'iv': base64.urlsafe_b64encode(iv).decode(),
+                        'response': response
+                    })
+
+                return __redirect_or_end(current_zkp)
             else:
                 raise cherrypy.HTTPError(410, message="Expired key")
         else:
@@ -307,34 +338,48 @@ class IdP(Asymmetric_IdP):
         request_args = current_zkp.decipher_response(kwargs)
 
         username = request_args['username']
-        id_attrs_b64 = request_args['id_attrs'].encode()
 
-        response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64=id_attrs_b64, username=username)
-
-        method = current_zkp.method
+        method = current_zkp.current_method
+        auth_success = False
 
         if method == 'face':
             face_biometry = Face_biometry(username, save_faces_funct=save_faces, get_faces_funct=get_faces)
-            if face_biometry.verify_user(request_args['features']):
-                return current_zkp.create_response({
-                    'response': response_b64.decode(),
-                    'signature': response_signature_b64.decode()
-                })
-            else:
-                raise cherrypy.HTTPError(401, message="Authentication failed")
-
+            auth_success = face_biometry.verify_user(request_args['features'])
         elif method == 'fingerprint':
             fingerprint = Fingerprint(username, get_fingerprint_func=get_fingerprint)
-
-            if fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_descriptors'))):
-                return current_zkp.create_response({
-                    'response': response_b64.decode(),
-                    'signature': response_signature_b64.decode()
-                })
-            else:
-                raise cherrypy.HTTPError(401, message="Authentication failed")
+            auth_success = fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_descriptors')))
         else:
             raise cherrypy.HTTPError(403, message="Authentication method does not correspond with this endpoint")
+
+        if auth_success:
+            current_zkp.methods_successful.add(method)
+        else:
+            current_zkp.methods_unsuccessful.add(method)
+
+        if len(current_zkp.methods_successful) >= current_zkp.minimum_methods:
+            return current_zkp.create_response({
+                'redirect': True,
+                'status_code': 303,
+                'url': self.__redirect_helper_authentication(client_id=client_id)
+            })
+        elif auth_success:
+            id_attrs_b64 = request_args['id_attrs'].encode()
+            response_b64, response_signature_b64 = self.__get_id_attrs(id_attrs_b64=id_attrs_b64, username=username)
+            return current_zkp.create_response({
+                'redirect': False,
+                'response': response_b64.decode(),
+                'signature': response_signature_b64.decode(),
+                'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
+                'methods_successful': list(current_zkp.methods_successful),
+            })
+        else:
+            cherrypy.response.status = 401
+            return current_zkp.create_response({
+                'redirect': False,
+                'methods_unsuccessful': list(current_zkp.methods_unsuccessful),
+                'methods_successful': list(current_zkp.methods_successful),
+                'message': 'Authentication failed'
+            })
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

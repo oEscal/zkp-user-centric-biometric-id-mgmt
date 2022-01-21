@@ -116,12 +116,13 @@ class HelperApp(object):
         return self.__render_page('error.html', message=errors[error_id])
 
     @cherrypy.expose
-    def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str, method: str):
+    def login(self, sp: str, idp: str, id_attrs: str, consumer_url: str, sso_url: str, client: str, methods: str,
+              minimum_methods: str):
         self.__init__()
         attrs = id_attrs.split(',')
         return self.__render_page('login_attributes.html', sp=sp, idp=idp, id_attrs=attrs,
                                   sso_url=sso_url, consumer_url=consumer_url,
-                                  client=client, method=method)
+                                  client=client, methods=methods, minimum_methods=minimum_methods)
 
     def __is_logged_in(self):
         return bool(self.master_password_manager)
@@ -140,7 +141,7 @@ class HelperApp(object):
 
     @cherrypy.expose
     def authorize_attr_request(self, sp: str, idp: str, id_attrs: list, consumer_url: str, sso_url: str, client: str,
-                               method: str, **kwargs):
+                               methods: str, minimum_methods: str, **kwargs):
         if 'deny' in kwargs:
             return self.__render_page('auth_refused.html')
         elif 'allow' in kwargs:
@@ -151,7 +152,8 @@ class HelperApp(object):
             self.sso_url = sso_url
             self.sp_client = client
 
-            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={'method': method}), status=303)
+            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={
+                'methods': methods, 'minimum_methods': minimum_methods}), status=303)
 
     def asymmetric_identification(self):
         id_attrs_b64 = base64.urlsafe_b64encode(json.dumps(self.id_attrs).encode())
@@ -173,6 +175,9 @@ class HelperApp(object):
             self.zkp_auth()
         else:
             response_dict = self.cipher_auth.decipher_response(response.json())
+            if response_dict['redirect']:
+                raise cherrypy.HTTPRedirect(response_dict['url'], status=response_dict['status_code'])
+
             try:
                 aes_key = self.password_manager.decrypt(base64.urlsafe_b64decode(response_dict['ciphered_aes_key']))
             except Exception as e:
@@ -628,7 +633,9 @@ class HelperApp(object):
 
             self.registration_method = kwargs['method']
 
-            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={'method': 'zkp'}), status=303)
+            raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={
+                'method': base64.urlsafe_b64encode(json.dumps(['zkp']).encode())
+            }), status=303)
         else:
             raise cherrypy.HTTPError(405)
 
@@ -686,6 +693,8 @@ class HelperApp(object):
                 **ciphered_params
             })
 
+            print(response.__dict__)
+
             if response.status_code != 200:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
@@ -695,6 +704,11 @@ class HelperApp(object):
                 # return {'message': "The IdP was not able to login with face"}
             else:
                 response_dict = self.cipher_auth.decipher_response(response.json())
+                if response_dict['redirect']:
+                    cherrypy.response.status = response_dict['status_code']
+                    return {'url': response_dict['url']}
+                    # raise cherrypy.HTTPRedirect(response_dict['url'], status=response_dict['status_code'])
+
                 self.response_attrs_b64 = response_dict['response']
                 self.response_signature_b64 = response_dict['signature']
 
@@ -715,7 +729,6 @@ class HelperApp(object):
                 'features': features
             })
 
-            print(self.reg_bio)
             response = requests.get(self.reg_bio, params={
                 'client': self.idp_client,
                 'method': 'face',
@@ -808,6 +821,10 @@ class HelperApp(object):
                 # return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
 
             response_dict = self.cipher_auth.decipher_response(response.json())
+            if response_dict['redirect']:
+                cherrypy.response.status = response_dict['status_code']
+                return {'url': response_dict['url']}
+
             self.response_attrs_b64 = response_dict['response']
             self.response_signature_b64 = response_dict['signature']
 
