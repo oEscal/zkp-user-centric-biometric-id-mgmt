@@ -829,18 +829,18 @@ class HelperApp(object):
                 cherrypy.response.status = 500
                 self.message = FINGERPRINT_ERRORS.get("LOGIN_ERROR")
                 # return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
+            else:
+                response_dict = self.cipher_auth.decipher_response(response.json())
+                if response_dict['redirect']:
+                    cherrypy.response.status = response_dict['status_code']
+                    return {'url': response_dict['url']}
 
-            response_dict = self.cipher_auth.decipher_response(response.json())
-            if response_dict['redirect']:
-                cherrypy.response.status = response_dict['status_code']
-                return {'url': response_dict['url']}
-
-            self.response_attrs_b64 = response_dict['response']
-            self.response_signature_b64 = response_dict['signature']
-            self.methods_successful_b64 = base64.urlsafe_b64encode(
-                json.dumps(response_dict['methods_successful']).encode()).decode()
-            self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
-                json.dumps(response_dict['methods_unsuccessful']).encode()).decode()
+                self.response_attrs_b64 = response_dict['response']
+                self.response_signature_b64 = response_dict['signature']
+                self.methods_successful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_successful']).encode()).decode()
+                self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_unsuccessful']).encode()).decode()
 
             cherrypy.response.status = 302
             return {'url': '/attribute_presentation'}

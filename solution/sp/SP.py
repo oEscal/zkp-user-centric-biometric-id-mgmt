@@ -32,6 +32,7 @@ HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
 
 clients_auth: typing.Dict[str, dict] = dict()
 clients_idp: typing.Dict[str, str] = dict()
+clients_auth_info: typing.Dict[str, dict] = dict()
 
 AUTH_METHODS = {
     'face': 'Face',
@@ -96,29 +97,16 @@ class SP(object):
         :param account:
         :return:
         """
-        contents = '<html><body>'
-        contents += '<p>Upload a new image file</p>'
-        contents += '<form action="add" method="post" enctype="multipart/form-data">'
-        contents += '<input type="file" name="image" /><br>'
-        contents += '<input type="submit" value="send" />'
-        contents += '</form>'
-        contents += '<form action="add" method="post" enctype="multipart/form-data">'
-        contents += '<p>List of uploaded image file</sp>'
-        contents += '<table border=0><tr>'
-
         path = f"accounts/{account}"
         files = os.listdir(path)
-        count = 0
         images_src = []
         for f in files:
-            contents += '<td><img src="/img?name=' + f + '"></td>'
-            count += 1
-            if count % 4 == 0:
-                contents += '</tr><tr>'
             images_src.append(f"/img?name={f}")
-        contents += '</tr></body></html>'
-        return self.__render_page('account_contents.html', images=images_src)
-        # return contents
+
+        cookies = cherrypy.request.cookie
+        request_id = cookies['client_id'].value
+        return self.__render_page('account_contents.html', images=images_src,
+                                  auth_info=clients_auth_info[request_id])
 
     @staticmethod
     def prepare_auth_parameter(request):
@@ -181,7 +169,7 @@ class SP(object):
                                           message="Error: You must select the number of biometric methods to consider!")
 
             if type(kwargs['methods']) is str:
-                kwargs['methods'] = list(kwargs['methods'])
+                kwargs['methods'] = [kwargs['methods']]
 
             # verifications
             for method in kwargs['methods']:
@@ -211,6 +199,8 @@ class SP(object):
     @cherrypy.expose
     def identity(self, response, methods_successful, methods_unsuccessful, signature, client):
         """Identity provisioning by an IdP
+        :param methods_unsuccessful:
+        :param methods_successful:
         :param client:
         :param response:
         :param signature:
@@ -246,6 +236,13 @@ class SP(object):
             cookies = cherrypy.request.cookie
             request_id = cookies['client_id'].value
             clients_auth[request_id] = attributes
+
+            clients_auth_info[request_id] = {}
+            for method in AUTH_METHODS:
+                if method in methods_successful:
+                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Successful'
+                elif method in methods_unsuccessful:
+                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Unsuccessful'
 
         return self.__render_page('redirect_index.html')
 

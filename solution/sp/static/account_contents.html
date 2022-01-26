@@ -40,27 +40,64 @@
             </div>
 
             <div class="container" style="display: none;" id="images">
-            <div class="form-group">
-                <div class="row mb-4 px-3 d-flex">
-                    <h3>Your images:</h3>
-                </div>
+                <div class="form-group">
+                    <div class="row mb-4 px-3 d-flex">
+                        <h3>Your images:</h3>
+                    </div>
 
+                </div>
+                <div class="container" id="images_container">
+                    {% for img in images %}
+                    <img src="{{ img }}" class="col-md-2 py-1">
+                    {% endfor %}
+                </div>
             </div>
-            <div class="container" id="images_container">
-                {% for img in images %}
-                <img src="{{ img }}" class="col-md-2 py-1">
-                {% endfor %}
-            </div>
-        </div>
 
 
         </form>
+
+
+        <div id="accordion">
+            <div class="card">
+                <div class="card-header" id="headingTwo">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseTwo"
+                                aria-expanded="false" aria-controls="collapseTwo">
+                            Authentication information
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+                    <div class="card-body">
+                        <table class="table table-striped table-bordered">
+                            <thead class="thead-dark">
+                            <tr>
+                                <th scope="col">Method</th>
+                                <th scope="col" class="text-center">Information</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for key, value in auth_info.items() %}
+                            <tr>
+                                <td><b>{{key}}</b></td>
+                                <td>{{value}}</td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
     </div>
 </div>
 
 <script type="application/javascript">
     $(document).ready(function () {
-        if($.trim($("#images_container").html()).length > 0)
+        if ($.trim($("#images_container").html()).length > 0)
             $("#images").show('slow');
     });
 </script>
