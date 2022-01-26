@@ -91,8 +91,7 @@ class SP(object):
         cookie[name]['max-age'] = f"{COOKIE_TTL}"
         cookie[name]['version'] = '1'
 
-    @staticmethod
-    def account_contents(account: str) -> str:
+    def account_contents(self, account: str) -> str:
         """Present the account images and an upload form
         :param account:
         :return:
@@ -110,13 +109,16 @@ class SP(object):
         path = f"accounts/{account}"
         files = os.listdir(path)
         count = 0
+        images_src = []
         for f in files:
             contents += '<td><img src="/img?name=' + f + '"></td>'
             count += 1
             if count % 4 == 0:
                 contents += '</tr><tr>'
+            images_src.append(f"/img?name={f}")
         contents += '</tr></body></html>'
-        return contents
+        return self.__render_page('account_contents.html', images=images_src)
+        # return contents
 
     @staticmethod
     def prepare_auth_parameter(request):
@@ -207,7 +209,7 @@ class SP(object):
         return self.__render_page('login.html')
 
     @cherrypy.expose
-    def identity(self, response, signature, client):
+    def identity(self, response, methods_successful, methods_unsuccessful, signature, client):
         """Identity provisioning by an IdP
         :param client:
         :param response:
@@ -234,7 +236,12 @@ class SP(object):
                 return
 
             attributes = json.loads(base64.urlsafe_b64decode(response))
+            methods_successful = json.loads(base64.urlsafe_b64decode(methods_successful))
+            methods_unsuccessful = json.loads(base64.urlsafe_b64decode(methods_unsuccessful))
+
             print(f"attributes: {attributes}")
+            print(f"Methods successful: {methods_successful}")
+            print(f"Methods unsuccessful: {methods_unsuccessful}")
 
             cookies = cherrypy.request.cookie
             request_id = cookies['client_id'].value
