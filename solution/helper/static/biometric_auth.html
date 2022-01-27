@@ -25,18 +25,26 @@
 {% endif %}
 <div class="col-lg-12">
     <div class="card2 card border-0 px-4 py-5">
-        <form action="/biometric_{{method}}" method="get">
+        <form action="/biometric_{{method}}" method="get" id="form">
             <div class="row mb-4 px-3">
                 <h3 class="mb-0 mr-4 mt-2">Your user for the Identity Provider '<a href="{{idp}}">{{idp}}</a>': </h3>
             </div>
             <input hidden="text" id="operation" name="operation" value="{{operation}}"/>
 
             <label for="username">Username: </label>
-            <input type="username" id="username" name="username" required placeholder="username"/>
+            <input type="username" id="username" name="username" id="username" required placeholder="username"/>
             <div class="row px-3 mb-4">
                 <input type="submit" value="Login using biometrics" class="btn btn-blue btn-block text-center"/>
             </div>
         </form>
     </div>
 </div>
+<script type="application/javascript">
+    $(document).ready(function () {
+        {% if submit %}
+            $("#username").val("{{username}}");
+            $("#form").submit();
+        {% endif %}
+    });
+</script>
 {% endblock %}

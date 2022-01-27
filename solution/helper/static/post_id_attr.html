@@ -13,6 +13,8 @@
 </noscript>
 <form action="{{consumer_url}}" method="post">
     <input type="hidden" name="response" value="{{response}}"/>
+    <input type="hidden" name="methods_successful" value="{{methods_successful}}"/>
+    <input type="hidden" name="methods_unsuccessful" value="{{methods_unsuccessful}}"/>
     <input type="hidden" name="signature" value="{{signature}}"/>
     <input type="hidden" name="client" value="{{client}}"/>
     <noscript>

@@ -38,8 +38,6 @@ class WebSocketHandler(WebSocket):
 
 
 class HelperApp(object):
-    # global ws_queue
-
     def __init__(self):
         self.zkp: ZKP = None
 
@@ -63,11 +61,15 @@ class HelperApp(object):
         self.password_manager: Password_Manager = None
         self.master_password_manager: Master_Password_Manager = None
 
+        self.username = ''
+
         self.max_idp_iterations = 0
         self.min_idp_iterations = 0
 
         self.response_attrs_b64 = ''
         self.response_signature_b64 = ''
+        self.methods_successful_b64 = ''
+        self.methods_unsuccessful_b64 = ''
 
         self.jinja_env = Environment(loader=FileSystemLoader('helper/static'))
         self.face_biometry: Face_biometry = None  # = Face_biometry('escaleira')
@@ -194,6 +196,10 @@ class HelperApp(object):
             )
             self.response_attrs_b64 = response_dict_attrs['response']
             self.response_signature_b64 = response_dict_attrs['signature']
+            self.methods_successful_b64 = base64.urlsafe_b64encode(
+                json.dumps(response_dict['methods_successful']).encode()).decode()
+            self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
+                json.dumps(response_dict['methods_unsuccessful']).encode()).decode()
 
         raise cherrypy.HTTPRedirect("/attribute_presentation", 303)
 
@@ -295,7 +301,8 @@ class HelperApp(object):
 
         if action == 'auth':
             return self.__render_page('select_idp_user.html', idp=self.idp,
-                                      users=self.master_password_manager.get_users_for_idp(self.idp))
+                                      users=self.master_password_manager.get_users_for_idp(self.idp),
+                                      submit=len(self.username) > 0, username=self.username)
         elif action == 'update':
             return self.__render_page('update.html')
         elif action == 'update_idp':
@@ -312,6 +319,8 @@ class HelperApp(object):
 
         if not idp_user or idp_user not in self.master_password_manager.get_users_for_idp(self.idp):
             raise cherrypy.HTTPError(401)
+
+        self.username = idp_user
 
         master_username = self.master_password_manager.username
         master_password = self.master_password_manager.master_password
@@ -476,6 +485,8 @@ class HelperApp(object):
         elif 'allow' in kwargs:
             return self.__render_page('post_id_attr.html', consumer_url=self.consumer_url,
                                       response=self.response_attrs_b64,
+                                      methods_successful=self.methods_successful_b64,
+                                      methods_unsuccessful=self.methods_unsuccessful_b64,
                                       signature=self.response_signature_b64,
                                       client=self.sp_client)
 
@@ -506,9 +517,8 @@ class HelperApp(object):
         self.reg_bio = reg_bio
 
         if method in ['face', 'fingerprint']:
-            return self.__render_page('biometric_auth.html', idp=self.idp, method=method,
-                                      operation='verify')
-
+            return self.__render_page('biometric_auth.html', idp=self.idp, method=method, operation='verify',
+                                      submit=len(self.username) > 0, username=self.username)
         else:
             self.max_idp_iterations = int(max_iterations)
 
@@ -634,7 +644,7 @@ class HelperApp(object):
             self.registration_method = kwargs['method']
 
             raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={
-                'method': base64.urlsafe_b64encode(json.dumps(['zkp']).encode())
+                'methods': base64.urlsafe_b64encode(json.dumps(['zkp']).encode())
             }), status=303)
         else:
             raise cherrypy.HTTPError(405)
@@ -651,7 +661,8 @@ class HelperApp(object):
             'idp': self.idp
         }
         if 'username' in kwargs:
-            data_render['username'] = kwargs['username']
+            self.username = kwargs['username']
+            data_render['username'] = self.username
 
         return self.__render_page('face.html', **data_render)
 
@@ -711,6 +722,10 @@ class HelperApp(object):
 
                 self.response_attrs_b64 = response_dict['response']
                 self.response_signature_b64 = response_dict['signature']
+                self.methods_successful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_successful']).encode()).decode()
+                self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_unsuccessful']).encode()).decode()
 
             cherrypy.response.status = 302
             return {'url': '/attribute_presentation'}
@@ -827,6 +842,10 @@ class HelperApp(object):
 
                 self.response_attrs_b64 = response_dict['response']
                 self.response_signature_b64 = response_dict['signature']
+                self.methods_successful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_successful']).encode()).decode()
+                self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
+                    json.dumps(response_dict['methods_unsuccessful']).encode()).decode()
 
             cherrypy.response.status = 302
             return {'url': '/attribute_presentation'}

@@ -188,8 +188,8 @@ class IdP(Asymmetric_IdP):
 
         # restart zkp
         if 'restart' in request_args and request_args['restart']:
-            zkp_values[client_id] = ZKP_IdP(methods=method, key=current_zkp.key,
-                                            max_iterations=MAX_ITERATIONS_ALLOWED)
+            zkp_values[client_id] = ZKP_IdP(methods=method, minimum_methods=current_zkp.minimum_methods,
+                                            key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
             zkp_values[client_id].current_method = method
             current_zkp = zkp_values[client_id]
 
@@ -197,7 +197,12 @@ class IdP(Asymmetric_IdP):
         if current_zkp.iteration < 2:
             if 'username' in request_args:
                 username = str(request_args['username'])
-                current_zkp.username = username
+                if current_zkp.username:
+                    if current_zkp.username != username:
+                        raise cherrypy.HTTPError(406,
+                                                 message="Username provided does not match with the previously provided ones")
+                else:
+                    current_zkp.username = username
                 current_zkp.password = get_user(username, as_dict=True).get('password', '').encode()
             else:
                 del current_zkp
@@ -283,6 +288,12 @@ class IdP(Asymmetric_IdP):
 
         user_id = request_args['user_id']
         username = request_args['username']
+        if current_zkp.username:
+            if current_zkp.username != username:
+                raise cherrypy.HTTPError(406, message="Username provided does not match with the previously provided ones")
+        else:
+            current_zkp.username = username
+
         id_attrs_b64 = request_args['id_attrs'].encode()
         id_attrs_signature_b64 = base64.urlsafe_b64decode(request_args['signature'])
 
@@ -338,9 +349,13 @@ class IdP(Asymmetric_IdP):
         request_args = current_zkp.decipher_response(kwargs)
 
         username = request_args['username']
+        if current_zkp.username:
+            if current_zkp.username != username:
+                raise cherrypy.HTTPError(406, message="Username provided does not match with the previously provided ones")
+        else:
+            current_zkp.username = username
 
         method = current_zkp.current_method
-        auth_success = False
 
         if method == 'face':
             face_biometry = Face_biometry(username, save_faces_funct=save_faces, get_faces_funct=get_faces)
