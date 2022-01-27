@@ -106,7 +106,7 @@ class SP(object):
         cookies = cherrypy.request.cookie
         request_id = cookies['client_id'].value
         return self.__render_page('account_contents.html', images=images_src,
-                                  auth_info=clients_auth_info[request_id])
+                                  auth_info=clients_auth_info[request_id] if request_id in clients_auth else {})
 
     @staticmethod
     def prepare_auth_parameter(request):
@@ -209,6 +209,24 @@ class SP(object):
         if cherrypy.request.method == 'POST':
             signature = base64.urlsafe_b64decode(signature)
 
+            cookies = cherrypy.request.cookie
+            request_id = cookies['client_id'].value
+            clients_auth_info[request_id] = {}
+
+            if methods_successful and methods_unsuccessful:
+                methods_successful = json.loads(base64.urlsafe_b64decode(methods_successful))
+                methods_unsuccessful = json.loads(base64.urlsafe_b64decode(methods_unsuccessful))
+
+                print(f"Methods successful: {methods_successful}")
+                print(f"Methods unsuccessful: {methods_unsuccessful}")
+
+                clients_auth_info[request_id] = {}
+                for method in AUTH_METHODS:
+                    if method in methods_successful:
+                        clients_auth_info[request_id][AUTH_METHODS[method]] = 'Successful'
+                    elif method in methods_unsuccessful:
+                        clients_auth_info[request_id][AUTH_METHODS[method]] = 'Unsuccessful'
+
             try:
                 # read from the file where is stored the used IdP (the file name will be the base64 of the IdP's URL)
                 file_name = base64.urlsafe_b64encode(clients_idp[client].encode()).decode()
@@ -219,30 +237,18 @@ class SP(object):
                                          padding=asymmetric_padding_signature(), algorithm=asymmetric_hash())
             except InvalidSignature:
                 del clients_auth[client]
-                return "<h1>Error: Invalid signature from the Identity Provider!</h1>"
+                return self.__render_page('invalid.html',
+                                          auth_info=clients_auth_info[request_id])
             except Exception as e:
                 del clients_auth[client]
                 print(f"Error in function <{self.identity.__name__}>: <{e}>")
                 return
 
             attributes = json.loads(base64.urlsafe_b64decode(response))
-            methods_successful = json.loads(base64.urlsafe_b64decode(methods_successful))
-            methods_unsuccessful = json.loads(base64.urlsafe_b64decode(methods_unsuccessful))
 
             print(f"attributes: {attributes}")
-            print(f"Methods successful: {methods_successful}")
-            print(f"Methods unsuccessful: {methods_unsuccessful}")
 
-            cookies = cherrypy.request.cookie
-            request_id = cookies['client_id'].value
             clients_auth[request_id] = attributes
-
-            clients_auth_info[request_id] = {}
-            for method in AUTH_METHODS:
-                if method in methods_successful:
-                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Successful'
-                elif method in methods_unsuccessful:
-                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Unsuccessful'
 
         return self.__render_page('redirect_index.html')
 

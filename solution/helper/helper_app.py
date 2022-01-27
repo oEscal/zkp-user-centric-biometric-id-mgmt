@@ -172,7 +172,7 @@ class HelperApp(object):
                                     'client': self.idp_client,
                                     **ciphered_params
                                 })
-        if response.status_code != 200:
+        if response.status_code != 200 and response.status_code != 401:
             print(f"Error status: {response.status_code}")
             self.zkp_auth()
         else:
@@ -194,8 +194,11 @@ class HelperApp(object):
                 data=response_dict['response'],
                 iv=iv
             )
-            self.response_attrs_b64 = response_dict_attrs['response']
-            self.response_signature_b64 = response_dict_attrs['signature']
+
+            if response.status_code == 200:
+                self.response_attrs_b64 = response_dict['response']
+                self.response_signature_b64 = response_dict['signature']
+
             self.methods_successful_b64 = base64.urlsafe_b64encode(
                 json.dumps(response_dict['methods_successful']).encode()).decode()
             self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
@@ -708,7 +711,7 @@ class HelperApp(object):
 
             print(response.__dict__)
 
-            if response.status_code != 200:
+            if response.status_code != 200 and response.status_code != 401:
                 # TODO ->  ANALISAR QUAL O FLOW A SER SEGUIDO
                 print(f"Error status: {response.status_code}")
                 # self.zkp_auth()
@@ -722,8 +725,10 @@ class HelperApp(object):
                     return {'url': response_dict['url']}
                     # raise cherrypy.HTTPRedirect(response_dict['url'], status=response_dict['status_code'])
 
-                self.response_attrs_b64 = response_dict['response']
-                self.response_signature_b64 = response_dict['signature']
+                if response.status_code == 200:
+                    self.response_attrs_b64 = response_dict['response']
+                    self.response_signature_b64 = response_dict['signature']
+
                 self.methods_successful_b64 = base64.urlsafe_b64encode(
                     json.dumps(response_dict['methods_successful']).encode()).decode()
                 self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
@@ -832,7 +837,7 @@ class HelperApp(object):
                 **ciphered_params
             })
 
-            if response.status_code != 200:
+            if response.status_code != 200 and response.status_code != 401:
                 cherrypy.response.status = 500
                 self.message = FINGERPRINT_ERRORS.get("LOGIN_ERROR")
                 # return {'message': FINGERPRINT_ERRORS.get("LOGIN_ERROR")}
@@ -842,8 +847,10 @@ class HelperApp(object):
                     cherrypy.response.status = response_dict['status_code']
                     return {'url': response_dict['url']}
 
-                self.response_attrs_b64 = response_dict['response']
-                self.response_signature_b64 = response_dict['signature']
+                if response.status_code == 200:
+                    self.response_attrs_b64 = response_dict['response']
+                    self.response_signature_b64 = response_dict['signature']
+
                 self.methods_successful_b64 = base64.urlsafe_b64encode(
                     json.dumps(response_dict['methods_successful']).encode()).decode()
                 self.methods_unsuccessful_b64 = base64.urlsafe_b64encode(
