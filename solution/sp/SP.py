@@ -209,21 +209,23 @@ class SP(object):
         if cherrypy.request.method == 'POST':
             signature = base64.urlsafe_b64decode(signature)
 
-            methods_successful = json.loads(base64.urlsafe_b64decode(methods_successful))
-            methods_unsuccessful = json.loads(base64.urlsafe_b64decode(methods_unsuccessful))
-
-            print(f"Methods successful: {methods_successful}")
-            print(f"Methods unsuccessful: {methods_unsuccessful}")
-
             cookies = cherrypy.request.cookie
             request_id = cookies['client_id'].value
-
             clients_auth_info[request_id] = {}
-            for method in AUTH_METHODS:
-                if method in methods_successful:
-                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Successful'
-                elif method in methods_unsuccessful:
-                    clients_auth_info[request_id][AUTH_METHODS[method]] = 'Unsuccessful'
+
+            if methods_successful and methods_unsuccessful:
+                methods_successful = json.loads(base64.urlsafe_b64decode(methods_successful))
+                methods_unsuccessful = json.loads(base64.urlsafe_b64decode(methods_unsuccessful))
+
+                print(f"Methods successful: {methods_successful}")
+                print(f"Methods unsuccessful: {methods_unsuccessful}")
+
+                clients_auth_info[request_id] = {}
+                for method in AUTH_METHODS:
+                    if method in methods_successful:
+                        clients_auth_info[request_id][AUTH_METHODS[method]] = 'Successful'
+                    elif method in methods_unsuccessful:
+                        clients_auth_info[request_id][AUTH_METHODS[method]] = 'Unsuccessful'
 
             try:
                 # read from the file where is stored the used IdP (the file name will be the base64 of the IdP's URL)
@@ -236,7 +238,7 @@ class SP(object):
             except InvalidSignature:
                 del clients_auth[client]
                 return self.__render_page('invalid.html',
-                                          auth_info=clients_auth_info[request_id] if request_id in clients_auth else {})
+                                          auth_info=clients_auth_info[request_id])
             except Exception as e:
                 del clients_auth[client]
                 print(f"Error in function <{self.identity.__name__}>: <{e}>")
