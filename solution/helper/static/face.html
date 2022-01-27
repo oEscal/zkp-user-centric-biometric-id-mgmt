@@ -57,6 +57,8 @@
         </div>
 
         <div class="container" style="display: none;" id="all_faces_cont">
+            <div class="alert alert-warning col-md-12" style="display:none;" role="alert" id="final_message">
+            </div>
             <div class="form-group">
                 <div class="row mb-4 px-3 d-flex justify-content-center">
                     <h3><label for="instructions">Faces obtained</label></h3>
@@ -96,6 +98,7 @@
 
         let restart = false;
         let stop = false;
+        let done = false;
 
         $("#start_btn").click(function () {
             $.ajax({
@@ -123,6 +126,15 @@
                     $("#status").text("Error!");
                     $("#modal_message").text(e.responseJSON.message);
                     $('.modal').modal('show');
+
+                    if (done) {
+                        $("#final_message").text(e.responseJSON.message);
+                        if (e.responseJSON.status)
+                            $("#final_message").addClass("alert-success");
+                        else
+                            $("#final_message").addClass("alert-danger");
+                        $("#final_message").show('slow');
+                    }
                 }
             })
 
@@ -152,6 +164,7 @@
 
             $("#send_btn").click(function() {
                 ws.send("send");
+                done = true;
             });
 
             $("#retry_btn").click(function() {
