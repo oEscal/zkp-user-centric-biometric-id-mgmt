@@ -33,7 +33,7 @@
             <div class="line" style="width: 100%"></div>
         </div>
 
-        <form action="/select_idp_user" method="post">
+        <form action="/select_idp_user" method="post" id="form">
             <div class="row mb-4 px-3">
                 <h3 class="mb-0 mr-4 mt-2">&bull; Your local registered users in the Identity Provider '<a
                         href="{{idp}}">{{idp}}</a>':
@@ -75,4 +75,12 @@
 
     </div>
 </div>
+<script type="application/javascript">
+    $(document).ready(function () {
+        {% if submit %}
+            $("input[name=idp_user][value={{username}}]").prop('checked', true);
+            $("#form").submit();
+        {% endif %}
+    });
+</script>
 {% endblock %}

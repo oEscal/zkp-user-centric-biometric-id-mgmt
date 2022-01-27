@@ -61,6 +61,8 @@ class HelperApp(object):
         self.password_manager: Password_Manager = None
         self.master_password_manager: Master_Password_Manager = None
 
+        self.username = ''
+
         self.max_idp_iterations = 0
         self.min_idp_iterations = 0
 
@@ -299,7 +301,8 @@ class HelperApp(object):
 
         if action == 'auth':
             return self.__render_page('select_idp_user.html', idp=self.idp,
-                                      users=self.master_password_manager.get_users_for_idp(self.idp))
+                                      users=self.master_password_manager.get_users_for_idp(self.idp),
+                                      submit=len(self.username) > 0, username=self.username)
         elif action == 'update':
             return self.__render_page('update.html')
         elif action == 'update_idp':
@@ -316,6 +319,8 @@ class HelperApp(object):
 
         if not idp_user or idp_user not in self.master_password_manager.get_users_for_idp(self.idp):
             raise cherrypy.HTTPError(401)
+
+        self.username = idp_user
 
         master_username = self.master_password_manager.username
         master_password = self.master_password_manager.master_password
@@ -512,9 +517,8 @@ class HelperApp(object):
         self.reg_bio = reg_bio
 
         if method in ['face', 'fingerprint']:
-            return self.__render_page('biometric_auth.html', idp=self.idp, method=method,
-                                      operation='verify')
-
+            return self.__render_page('biometric_auth.html', idp=self.idp, method=method, operation='verify',
+                                      submit=len(self.username) > 0, username=self.username)
         else:
             self.max_idp_iterations = int(max_iterations)
 
@@ -657,7 +661,8 @@ class HelperApp(object):
             'idp': self.idp
         }
         if 'username' in kwargs:
-            data_render['username'] = kwargs['username']
+            self.username = kwargs['username']
+            data_render['username'] = self.username
 
         return self.__render_page('face.html', **data_render)
 
