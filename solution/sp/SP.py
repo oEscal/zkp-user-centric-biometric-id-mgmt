@@ -26,7 +26,7 @@ IDP_PORT = 8082
 # noinspection HttpUrlsUsage
 IDP_URL = f"http://{IDP_HOST_NAME}:{IDP_PORT}"
 
-HELPER_HOST_NAME = "127.1.2.3"          # zkp_helper_app
+HELPER_HOST_NAME = "127.1.2.3"  # zkp_helper_app
 HELPER_PORT = 1080
 HELPER_URL = f"http://{HELPER_HOST_NAME}:{HELPER_PORT}"
 

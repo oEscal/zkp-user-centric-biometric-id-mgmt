@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {
   "ola": {
     "salt": "Zr8gliMz7Mwq09ZFq4MC6w==",
@@ -28,6 +27,4 @@
     }
   }
 }
-=======
-{"ola": {"salt": "Zr8gliMz7Mwq09ZFq4MC6w==", "password": "422D/cwVyPSLNZXwprayW98q0azop0614DpyhCweZqY=", "idps": {"http://127.0.0.1:8082": ["ola", "escaleira", "username"], "http://127.0.0.1:8083": ["test", "username"]}}, "escaleira": {"salt": "i5sKH0Msz4MTPmQae0Sfuw==", "password": "KWUCb5tnb8OF6ehFFtYBplT/FcYdK64Mz/VL6OvVq3s=", "idps": {"http://127.0.0.1:8082": ["username", "escaleira", "rafael", "a\u00e7oriano", "ola", "um", "dois"]}}}
->>>>>>> 86c87b742239c0f704b370ef174e7c57313e4579
+
