@@ -127,12 +127,16 @@ def crop_image(img):
 
 
 def main():
-    images = os.listdir('fingerprints_database/fingerprints')
-    image1 = cv2.imread(f'fingerprints_database/fingerprints_old/1_rafael_l_5_1640623577.png', 0)
+    # images = os.listdir('fingerprints_database/fingerprints')
+    # image1 = cv2.imread(f'fingerprints_database/fingerprints_old/1_rafael_l_5_1640623577.png', 0)
     image2 = cv2.imread(f'fingerprints_database/fingerprints_class/6_rafael_l_2_1642092246.png', 0)
 
-    cv2.imwrite('image1.png', image1)
+    image2 = enhance_image(image2)
     cv2.imwrite('image2.png', image2)
+    extract_features(image2)
+
+    exit()
+    cv2.imwrite('image1.png', image1)
 
     image1 = enhance_image(image1)
     image2 = enhance_image(image2)
