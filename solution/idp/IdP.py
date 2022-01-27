@@ -188,7 +188,8 @@ class IdP(Asymmetric_IdP):
 
         # restart zkp
         if 'restart' in request_args and request_args['restart']:
-            zkp_values[client_id] = ZKP_IdP(methods=method, minimum_methods=current_zkp.minimum_methods,
+            zkp_values[client_id] = ZKP_IdP(methods=base64.urlsafe_b64encode(json.dumps(current_zkp.methods).encode()),
+                                            minimum_methods=current_zkp.minimum_methods,
                                             key=current_zkp.key, max_iterations=MAX_ITERATIONS_ALLOWED)
             zkp_values[client_id].current_method = method
             current_zkp = zkp_values[client_id]

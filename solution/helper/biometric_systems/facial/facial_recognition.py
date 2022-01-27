@@ -62,7 +62,7 @@ class Face_biometry:
                             add_face = False
                             break
                     if add_face:
-                        cv2.imwrite(f'{self.path_save}frame{n}.jpg', frame)
+                        # cv2.imwrite(f'{self.path_save}frame{n}.jpg', frame)
                         face_b64 = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()
                         self.ws(face_b64, operation="new_face")
 

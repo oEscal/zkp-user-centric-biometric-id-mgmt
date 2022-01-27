@@ -205,9 +205,9 @@ class HelperApp(object):
 
     def zkp_auth(self, restart=False):
         # verify if zkp was already done previously
-        if not restart and self.zkp is not None:
-            raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
-                                                       params={'error_id': 'zkp_inf_cycle'}), 301)
+        # if not restart and self.zkp is not None:
+        #     raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
+        #                                                params={'error_id': 'zkp_inf_cycle'}), 301)
 
         self.zkp = ZKP(self.password_manager.password)
         data_send = {
