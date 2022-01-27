@@ -415,7 +415,12 @@ class HelperApp(object):
                 return self.__render_page('update_idp_user.html', idp=self.idp, user=idp_user,
                                           message=message)
 
-            self.zkp_auth(restart=True)
+            if not self.register_biometric:
+                self.zkp_auth(restart=True)
+            else:
+                raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={
+                    'methods': base64.urlsafe_b64encode(json.dumps(['zkp']).encode())
+                }), status=303)
         else:
             raise cherrypy.HTTPError(405)
 
@@ -641,12 +646,12 @@ class HelperApp(object):
             self.password_manager = Password_Manager(master_username=master_username, master_password=master_password,
                                                      idp_user=selected_user, idp=self.idp)
 
+            self.registration_method = kwargs['method']
+
             # load password
             if not self.password_manager.load_password():
                 raise cherrypy.HTTPRedirect(create_get_url(f"{HELPER_URL}/error",
                                                            params={'error_id': 'load_pass_error'}), 301)
-
-            self.registration_method = kwargs['method']
 
             raise cherrypy.HTTPRedirect(create_get_url(self.sso_url, params={
                 'methods': base64.urlsafe_b64encode(json.dumps(['zkp']).encode())
@@ -762,9 +767,11 @@ class HelperApp(object):
                 print(f"Error received from idp on function <{self.biometric_face.__name__}>: "
                       f"<{response.status_code}: {response.reason}>")
                 cherrypy.response.status = 500
-                return {'message': "There was an error registering this user's face on the selected IdP."}
+                return {'message': "There was an error registering this user's face on the selected IdP.",
+                        'status': False}
             else:
-                return {'message': 'The faces where registered on the IdP with success!'}
+                return {'message': 'The faces where registered on the IdP with success!',
+                        'status': True}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
