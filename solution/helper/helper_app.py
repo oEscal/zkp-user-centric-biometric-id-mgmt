@@ -297,6 +297,7 @@ class HelperApp(object):
         # verify master password
         self.master_password_manager = Master_Password_Manager(username=username, master_password=password)
         if not self.master_password_manager.login():
+            self.master_password_manager = None
             return self.__render_page('keychain.html', action=action, message='Error: Unsuccessful login!')
 
         if action == 'auth':
@@ -596,6 +597,7 @@ class HelperApp(object):
 
             self.master_password_manager = Master_Password_Manager(username=username, master_password=master_password)
             if not self.master_password_manager.register_user():
+                self.master_password_manager = None
                 return self.__render_page('register.html', message='Error: The inserted user already exists!')
 
             return self.__render_page('register.html', message='Success: The user was registered with success')

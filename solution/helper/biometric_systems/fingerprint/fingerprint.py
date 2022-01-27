@@ -29,10 +29,6 @@ SIMILAR_IMAGE = 7
 VALID_IMAGE = 8
 ALL_IMAGES_VALID = 9
 
-upscaler = cv2.dnn_superres.DnnSuperResImpl_create()
-upscaler.readModel('FSRCNN_x2.pb')
-upscaler.setModel("fsrcnn", 2)
-
 
 class Fingerprint:
     def __init__(self, n_img=10, scans_per_image=10, n_processes=5):
@@ -121,7 +117,7 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.72, quality_threshold=0.65):
+    def valid_image(self, current_image, other_images, difference_threshold=0.60, quality_threshold=0.65):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 
@@ -191,10 +187,6 @@ class Fingerprint:
         out = enhance_Fingerprint(img)
         return out
 
-    def _upscale_image(self, img):
-        img = upscaler.upsample(img)
-        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
     def _generate_key_points(self, features_terminations, features_bifurcations):
         key_points_terminations = []
         key_points_bifurcations = []
@@ -221,7 +213,7 @@ class Fingerprint:
         return desc_terminations, desc_bifurcations
 
     def _descriptors_generation_workflow(self, img):
-        out = self._enhance_image(self._upscale_image(img))
+        out = self._enhance_image(img)
         features_terminations, features_bifurcations = extract_minutiae_features(out)
         kp_terminations, kp_bifurcations = self._generate_key_points(features_terminations, features_bifurcations)
         desc_terminations, desc_bifurcations = self._generate_descriptors(out, kp_terminations, kp_bifurcations)
