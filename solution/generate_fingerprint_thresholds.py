@@ -206,7 +206,7 @@ def main(args):
     optimizer = differential_evolution(func=score_function, bounds=bounds,
                                        args=(descriptors, descriptors_grouped_by_name, decision, times, name),
                                        workers=n_process,
-                                       disp=True, maxiter=100, tol=0.001, callback=cb_partial)
+                                       disp=True, maxiter=50, tol=0.001, callback=cb_partial)
 
     with open(f'{LOGS_DIR}/thresholds_{name}_{START}_{decision}.json', 'w') as fp:
         json.dump({
