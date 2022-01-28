@@ -196,8 +196,8 @@ class HelperApp(object):
             )
 
             if response.status_code == 200:
-                self.response_attrs_b64 = response_dict['response']
-                self.response_signature_b64 = response_dict['signature']
+                self.response_attrs_b64 = response_dict_attrs['response']
+                self.response_signature_b64 = response_dict_attrs['signature']
 
             self.methods_successful_b64 = base64.urlsafe_b64encode(
                 json.dumps(response_dict['methods_successful']).encode()).decode()
