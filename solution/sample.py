@@ -131,9 +131,9 @@ def main():
     # image1 = cv2.imread(f'fingerprints_database/fingerprints_old/1_rafael_l_5_1640623577.png', 0)
     image2 = cv2.imread(f'fingerprints_database/fingerprints_class/6_rafael_l_2_1642092246.png', 0)
 
+    cv2.imwrite('image2_original.png', image2)
     image2 = enhance_image(image2)
     cv2.imwrite('image2.png', image2)
-    extract_features(image2)
 
     exit()
     cv2.imwrite('image1.png', image1)

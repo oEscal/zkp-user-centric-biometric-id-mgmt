@@ -362,6 +362,7 @@ class IdP(Asymmetric_IdP):
             face_biometry = Face_biometry(username, save_faces_funct=save_faces, get_faces_funct=get_faces)
             auth_success = face_biometry.verify_user(request_args['features'])
         elif method == 'fingerprint':
+            print(username)
             fingerprint = Fingerprint(username, get_fingerprint_func=get_fingerprint)
             auth_success = fingerprint.verify_user(base64.b64decode(request_args.get('fingerprint_descriptors')))
         else:
