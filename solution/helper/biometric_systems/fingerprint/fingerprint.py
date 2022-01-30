@@ -105,8 +105,8 @@ class Fingerprint:
                     continue
 
                 self.img_buffer.append(image)
-                # with open(f'fingerprints_class/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
-                #     fp.write(image_binary)
+                with open(f'fingerprints_database/fingerprints_class/{finger_img}_{name}_{side}_{index_finger}_{start_time}.png', 'wb') as fp:
+                    fp.write(image_binary)
 
                 finger_img += 1
                 yield self.create_yield_object("\nValid image\n", VALID_IMAGE)
@@ -117,7 +117,7 @@ class Fingerprint:
             yield self.create_yield_object(f'{e}\n', ERROR, False)
             return
 
-    def valid_image(self, current_image, other_images, difference_threshold=0.60, quality_threshold=0.65):
+    def valid_image(self, current_image, other_images, difference_threshold=0.60, quality_threshold=0.7):
         return {'is_different': self.__is_different_enough(current_image, other_images, difference_threshold),
                 'is_good': self.__is_good_enough(current_image, quality_threshold)}
 
