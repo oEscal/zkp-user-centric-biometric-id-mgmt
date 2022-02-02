@@ -4,7 +4,7 @@ import os
 import cv2.cv2
 import face_recognition
 
-from facial_recognition import Face_biometry, get_features_from_face
+from facial_recognition import get_features_from_face
 import pickle
 
 

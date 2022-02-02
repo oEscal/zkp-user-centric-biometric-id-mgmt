@@ -5,6 +5,7 @@ import pandas as pd
 from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
+import plotly.graph_objs as go
 
 
 def create_score_evolution_figure(data, title="Score evolution"):
@@ -30,6 +31,27 @@ def plot_bars(data, labels, title='Timestamp'):
 	})
 
 	fig = px.bar(df, x=labels[0], y=labels[1], title=title, text_auto=True)
+	fig.update_layout(clickmode='event+select')
+	return fig
+
+
+def plot_hist(data, labels, title='Timestamp'):
+	xVals = list([data[k].keys() for k in data.keys()][0])
+
+	yVals = []
+	for x in xVals:
+		yVals.append([data[j][x][0] for j in data])
+
+	fig = go.Figure(layout={
+		'title': title,
+		'xaxis': {'title': labels[0]},
+		'yaxis': {'title': labels[1]}
+	})
+	for i, y in enumerate(yVals):
+		fig.add_traces(go.Bar(x=list(data.keys()), y=y, name=xVals[i], text=[f'{i:.3}' for i in y], textposition='auto'))
+
+	# fig = px.histogram(ola, x=labels[0], y=labels[1], title=title, text_auto=True, barmode="group")
+	# fig.add_trace(px.histogram(df2, x=labels[0], y=labels[1], title=title, text_auto=True))
 	fig.update_layout(clickmode='event+select')
 	return fig
 
@@ -100,6 +122,19 @@ def main(logs_path):
 		elif label == 'compare_facial':
 			current_data = dict([(k, v.get('score')) for k, v in get_data(value).items()]) if value is not None else []
 			return plot_bars(current_data, ['Decision Algorithm', 'Score'], f'Best score of each decision algorithm')
+		elif label == 'compare_facial_voting':
+			current_data = {k: {
+				'False positive rate': [v.get('fp')/v.get('tn')],
+				'False negative rate': [v.get('fn')/v.get('tp')],
+			} for k, v in get_data(value).items()} if value is not None else {}
+
+			final = {}
+			for c in current_data:
+				for metric in current_data[c]:
+					if metric not in final:
+						final[metric] = {}
+					final[metric][c] = current_data[c][metric]
+			return plot_hist(final, ['Value', 'Metric'], f'Metrics for multiple score function with the voting decision algorithm')
 
 	return app
 
