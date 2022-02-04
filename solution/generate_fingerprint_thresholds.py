@@ -124,8 +124,8 @@ def score_function(parameters, descriptors, descriptors_grouped_by_name, decisio
 
             if decision == 'voting':
                 prediction = int(
-                    final_score_terminations <= voting_size_terminations and
-                    final_score_bifurcations <= voting_size_bifurcations
+                    final_score_terminations >= voting_size_terminations and
+                    final_score_bifurcations >= voting_size_bifurcations
                 )
             else:
                 prediction = int(
