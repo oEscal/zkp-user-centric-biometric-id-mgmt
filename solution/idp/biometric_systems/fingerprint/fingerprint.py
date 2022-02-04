@@ -8,8 +8,10 @@ FINGERPRINT_ERRORS = {
     'REGISTER_ERROR': "There was an error registering this user's fingerprint on the selected IdP.",
     'LOGIN_ERROR': "The IdP was no able to login with face"
 }
-TERMINATIONS_THRESHOLD = 67.5
-BIFURCATIONS_THRESHOLD = 49.5
+TERMINATIONS_THRESHOLD = 80.0402578479092
+BIFURCATIONS_THRESHOLD = 55.116784143566555
+TERMINATIONS_VOTERS = 3
+BIFURCATIONS_VOTERS = 1
 
 
 class Fingerprint:
@@ -56,13 +58,17 @@ class Fingerprint:
         incoming_descriptor_terminations, incoming_descriptor_bifurcations = fingerprint_descriptors[0]
         saved_descriptors = pickle.loads(self.get_fingerprint_func(self.username))
 
+        terminations_votes = 0
+        bifurcations_votes = 0
         for descriptor in saved_descriptors:
             score_terminations, score_bifurcations = self.__get_scores(
                 (descriptor[0], incoming_descriptor_terminations,),
                 (descriptor[1], incoming_descriptor_bifurcations,)
             )
+
+            terminations_votes += int(score_terminations <= TERMINATIONS_THRESHOLD)
+            bifurcations_votes += int(score_bifurcations <= BIFURCATIONS_THRESHOLD)
             print(f'{score_terminations=}')
             print(f'{score_bifurcations=}')
-            if score_terminations < TERMINATIONS_THRESHOLD and score_bifurcations < BIFURCATIONS_THRESHOLD:
-                return True
-        return False
+
+        return terminations_votes >= TERMINATIONS_VOTERS and bifurcations_votes >= BIFURCATIONS_VOTERS

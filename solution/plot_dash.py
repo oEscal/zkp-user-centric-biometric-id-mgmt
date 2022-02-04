@@ -119,7 +119,7 @@ def main(logs_path):
 		elif label == 'upscaling_time':
 			current_data = dict([(k, v.get('total')) for k, v in get_data(value).items()]) if value is not None else []
 			return plot_bars(current_data, ['Method', 'Timestamp'], f'Total timestamp foreach upscalling method')
-		elif label == 'compare_facial':
+		elif label in ['compare_facial', 'compare_fingerprint']:
 			current_data = dict([(k, v.get('score')) for k, v in get_data(value).items()]) if value is not None else []
 			return plot_bars(current_data, ['Decision Algorithm', 'Score'], f'Best score of each decision algorithm')
 		elif label == 'compare_facial_voting':
